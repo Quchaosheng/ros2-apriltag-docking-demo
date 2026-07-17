@@ -1,0 +1,5 @@
+docks:
+  demo_charge_dock:
+    type: charging_dock
+    frame: odom
+    pose: [2.0, 0.0, 0.0]
