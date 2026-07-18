@@ -107,7 +107,7 @@ docking_server:
       external_detection_rotation_pitch: 1.57
       external_detection_rotation_roll: -1.57
       filter_coef: 0.2
-      staging_x_offset: -0.7
+      staging_x_offset: -1.2
       staging_yaw_offset: 0.0
       use_battery_status: false
       docking_threshold: 0.05

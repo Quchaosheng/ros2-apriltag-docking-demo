@@ -27,7 +27,7 @@ docking_server:
       external_detection_rotation_pitch: 1.57
       external_detection_rotation_roll: -1.57
       filter_coef: 0.2
-      staging_x_offset: -0.7
+      staging_x_offset: -1.2
       staging_yaw_offset: 0.0
       use_battery_status: false
       docking_threshold: 0.05
@@ -46,7 +46,6 @@ tag_pose_bridge:
     loss_timeout: 0.5
     max_translation_jump: 0.25
     max_yaw_jump_deg: 20.0
-    tf_timeout: 0.2
 
 docking_task_bridge:
   ros__parameters:
