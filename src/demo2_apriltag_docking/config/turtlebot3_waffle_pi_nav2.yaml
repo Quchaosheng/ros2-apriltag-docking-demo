@@ -110,7 +110,7 @@ docking_server:
       staging_x_offset: -1.2
       staging_yaw_offset: 0.0
       use_battery_status: false
-      docking_threshold: 0.05
+      docking_threshold: 0.10
     enable_stamped_cmd_vel: true
 
 controller_server:
