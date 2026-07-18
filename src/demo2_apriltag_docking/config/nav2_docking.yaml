@@ -1,0 +1,63 @@
+docking_server:
+  ros__parameters:
+    use_sim_time: true
+    controller_frequency: 20.0
+    initial_perception_timeout: 5.0
+    wait_charge_timeout: 3.0
+    dock_approach_timeout: 30.0
+    rotate_to_dock_timeout: 10.0
+    max_retries: 2
+    base_frame: base_link
+    fixed_frame: odom
+    odom_topic: odom
+    dock_prestaging_tolerance: 0.5
+    controller:
+      use_collision_detection: false
+      transform_tolerance: 0.2
+    dock_plugins: [charging_dock]
+    charging_dock:
+      plugin: opennav_docking::SimpleChargingDock
+      dock_direction: forward
+      rotate_to_dock: false
+      use_external_detection_pose: true
+      external_detection_timeout: 0.8
+      external_detection_translation_x: -0.20
+      external_detection_translation_y: 0.0
+      external_detection_rotation_yaw: 0.0
+      external_detection_rotation_pitch: 1.57
+      external_detection_rotation_roll: -1.57
+      filter_coef: 0.2
+      staging_x_offset: -0.7
+      staging_yaw_offset: 0.0
+      use_battery_status: false
+      docking_threshold: 0.05
+
+tag_pose_bridge:
+  ros__parameters:
+    use_sim_time: true
+    detections_topic: /apriltag/detections
+    output_pose_topic: /detected_dock_pose
+    state_topic: /demo2/tag_state
+    min_decision_margin: 50.0
+    max_hamming: 0
+    confirmations: 3
+    confirmation_window: 0.5
+    publish_rate_hz: 10.0
+    loss_timeout: 0.5
+    max_translation_jump: 0.25
+    max_yaw_jump_deg: 20.0
+    tf_timeout: 0.2
+
+docking_task_bridge:
+  ros__parameters:
+    use_sim_time: true
+    target_tag_id: 0
+    dock_action_name: /dock_robot
+    start_service: /demo2/start_docking
+    cancel_service: /demo2/cancel_docking
+    guard_topic: /guard/docking_allowed
+    guard_required: false
+    guard_timeout: 2.0
+    state_topic: /demo2/docking_state
+    max_staging_time: 60.0
+    navigate_to_staging_pose: true

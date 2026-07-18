@@ -1,0 +1,5 @@
+docks:
+  0:
+    dock_id: demo_charge_dock
+    dock_type: charging_dock
+    tag_frame: tag36h11:0
