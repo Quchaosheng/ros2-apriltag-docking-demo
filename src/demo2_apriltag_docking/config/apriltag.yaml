@@ -10,4 +10,4 @@ apriltag:
       blur: 0.0
       refinement: 1
       sharpening: 0.25
-      debug: 0
+      debug: false
