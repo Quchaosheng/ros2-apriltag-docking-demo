@@ -1,8 +1,7 @@
 from pathlib import Path
 
-import yaml
-
 from demo2_apriltag_docking.tag_policy import load_dock_specs
+import yaml
 
 
 CONFIG = Path(__file__).parents[1] / 'config'
@@ -43,6 +42,7 @@ def test_nav2_docking_uses_external_pose_and_bounded_retries():
     assert plugin['use_external_detection_pose'] is True
     assert plugin['external_detection_timeout'] == 0.8
     assert plugin['use_battery_status'] is False
+    assert plugin['staging_x_offset'] == -1.2
 
 
 def test_dock_database_uses_same_dock_id_and_type():

@@ -1,21 +1,19 @@
-import rclpy
-import yaml
 from action_msgs.msg import GoalStatus
+from demo2_apriltag_docking.monitor import make_status, shutdown_if_running
+from demo2_apriltag_docking.tag_policy import load_dock_specs
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
+import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Bool, String
 from std_srvs.srv import Trigger
+import yaml
 
 try:
     from nav2_msgs.action import DockRobot
 except ImportError:  # Humble compatibility; Jazzy carries this action in nav2_msgs.
     from opennav_docking_msgs.action import DockRobot
-
-from demo2_apriltag_docking.monitor import make_status, shutdown_if_running
-from demo2_apriltag_docking.tag_policy import load_dock_specs
-
 
 FEEDBACK_STATES = {
     1: 'NAV_TO_STAGING',
@@ -28,6 +26,14 @@ FEEDBACK_STATES = {
 
 def feedback_state_name(value):
     return FEEDBACK_STATES.get(int(value), 'UNKNOWN')
+
+
+def guard_qos_profile():
+    return QoSProfile(
+        depth=1,
+        reliability=ReliabilityPolicy.RELIABLE,
+        durability=DurabilityPolicy.VOLATILE,
+    )
 
 
 class TaskPolicy:
@@ -112,7 +118,7 @@ class DockingTaskBridge(Node):
             Bool,
             self.get_parameter('guard_topic').value,
             self._on_guard,
-            state_qos,
+            guard_qos_profile(),
         )
         self.action_client = ActionClient(
             self,
