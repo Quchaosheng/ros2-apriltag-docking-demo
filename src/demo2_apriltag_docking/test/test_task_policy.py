@@ -46,6 +46,29 @@ def test_active_action_rejects_duplicate_start():
     assert policy.can_start(now=1.0) == (False, 'ALREADY_ACTIVE')
 
 
+def test_active_action_cancels_when_guard_turns_false():
+    policy = TaskPolicy(guard_required=True, guard_timeout=2.0)
+    policy.action_active = True
+    policy.update_guard(False, stamp=1.0)
+
+    assert policy.cancel_reason(now=1.0) == 'GUARD_DENIED'
+
+
+def test_active_action_cancels_when_guard_becomes_stale():
+    policy = TaskPolicy(guard_required=True, guard_timeout=2.0)
+    policy.action_active = True
+    policy.update_guard(True, stamp=1.0)
+
+    assert policy.cancel_reason(now=3.1) == 'GUARD_STALE'
+
+
+def test_optional_guard_never_cancels_action():
+    policy = TaskPolicy(guard_required=False, guard_timeout=2.0)
+    policy.action_active = True
+
+    assert policy.cancel_reason(now=100.0) is None
+
+
 @pytest.mark.parametrize(
     ('value', 'name'),
     [
