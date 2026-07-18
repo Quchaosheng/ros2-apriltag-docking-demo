@@ -13,7 +13,7 @@ try:
 except ImportError:  # Humble compatibility; Jazzy carries this action in nav2_msgs.
     from opennav_docking_msgs.action import DockRobot
 
-from demo2_apriltag_docking.monitor import make_status
+from demo2_apriltag_docking.monitor import make_status, shutdown_if_running
 from demo2_apriltag_docking.tag_policy import load_dock_specs
 
 
@@ -272,7 +272,7 @@ def main(args=None):
     finally:
         if node is not None:
             node.destroy_node()
-        rclpy.shutdown()
+        shutdown_if_running()
 
 
 if __name__ == '__main__':
