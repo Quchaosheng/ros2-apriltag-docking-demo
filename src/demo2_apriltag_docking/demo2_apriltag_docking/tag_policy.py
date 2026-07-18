@@ -1,5 +1,5 @@
-import math
 from dataclasses import dataclass
+import math
 
 
 @dataclass(frozen=True)
@@ -106,6 +106,12 @@ class TagGate:
         if detection.decision_margin < self.min_margin:
             return self._reject('LOW_MARGIN')
 
+        if (
+            self._last_seen is not None
+            and now - self._last_seen > self.loss_timeout
+        ):
+            self._last_accepted = None
+            self._reset_confirmation()
         self._last_seen = now
         if self._is_pose_jump(detection):
             return self._reject('POSE_JUMP')
@@ -139,6 +145,9 @@ class TagGate:
     def loss_reason(self, now):
         if self._last_seen is None or now - self._last_seen <= self.loss_timeout:
             return None
+        self._last_seen = None
+        self._last_accepted = None
+        self._reset_confirmation()
         return 'TAG_LOST'
 
     def _reject(self, reason):

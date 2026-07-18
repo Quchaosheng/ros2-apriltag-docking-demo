@@ -1,5 +1,5 @@
-import rclpy
 from diagnostic_msgs.msg import DiagnosticStatus, KeyValue
+import rclpy
 
 
 def make_status(node_name, level, message, values):
