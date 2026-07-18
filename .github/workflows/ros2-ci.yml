@@ -1,0 +1,28 @@
+name: ROS 2 CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  jazzy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: jazzy
+      - uses: ros-tooling/action-ros-ci@v0.4
+        with:
+          package-name: demo2_apriltag_docking
+          target-ros2-distro: jazzy
+          colcon-defaults: |
+            {
+              "build": {
+                "symlink-install": true
+              },
+              "test": {
+                "event-handlers": ["console_direct+"]
+              }
+            }
