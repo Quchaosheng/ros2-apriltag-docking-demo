@@ -1,12 +1,12 @@
 import math
 
 from apriltag_msgs.msg import AprilTagDetection
-from diagnostic_msgs.msg import DiagnosticStatus
-from geometry_msgs.msg import TransformStamped
-
 from demo2_apriltag_docking import monitor
+from demo2_apriltag_docking import tag_pose_bridge
 from demo2_apriltag_docking.monitor import make_status
 from demo2_apriltag_docking.tag_pose_bridge import to_policy_detection
+from diagnostic_msgs.msg import DiagnosticStatus
+from geometry_msgs.msg import TransformStamped
 
 
 def test_make_status_serializes_monitor_values():
@@ -48,6 +48,41 @@ def test_to_policy_detection_uses_tf_translation_and_wrapped_yaw():
     assert detection.x == 1.2
     assert detection.y == -0.3
     assert math.isclose(detection.yaw, math.pi / 2.0)
+
+
+def test_lookup_tag_transform_uses_cached_latest_tf():
+    class Buffer:
+        def lookup_transform(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+            return 'transform'
+
+    buffer = Buffer()
+
+    transform = tag_pose_bridge.lookup_tag_transform(
+        buffer,
+        'camera_rgb_frame',
+        'tag36h11:0',
+    )
+
+    assert transform == 'transform'
+    assert buffer.args[:2] == ('camera_rgb_frame', 'tag36h11:0')
+    assert buffer.args[2].nanoseconds == 0
+    assert buffer.kwargs == {}
+
+
+def test_pose_message_uses_transform_header_and_pose():
+    transform = TransformStamped()
+    transform.header.frame_id = 'camera_rgb_frame'
+    transform.header.stamp.sec = 7
+    transform.transform.translation.x = 1.2
+    transform.transform.rotation.w = 1.0
+
+    pose = tag_pose_bridge.to_pose_message(transform)
+
+    assert pose.header == transform.header
+    assert pose.pose.position.x == 1.2
+    assert pose.pose.orientation.w == 1.0
 
 
 def test_shutdown_only_runs_for_active_context(monkeypatch):
