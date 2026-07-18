@@ -21,14 +21,13 @@
         <material>
           <ambient>0.12 0.14 0.16 1</ambient>
           <diffuse>0.18 0.20 0.22 1</diffuse>
-          <roughness>0.8</roughness>
         </material>
       </visual>
       <visual name="tag_visual">
         <pose>-0.016 0 0.18 0 0 0</pose>
         <geometry>
           <box>
-            <size>0.002 0.16 0.16</size>
+            <size>0.002 0.20 0.20</size>
           </box>
         </geometry>
         <material>
@@ -36,11 +35,9 @@
           <diffuse>1 1 1 1</diffuse>
           <pbr>
             <metal>
-              <workflow>
-                <albedo_map>model://apriltag_dock/materials/textures/tag36_11_00000.png</albedo_map>
-                <metalness>0.0</metalness>
-                <roughness>1.0</roughness>
-              </workflow>
+              <albedo_map>model://apriltag_dock/materials/textures/tag36_11_00000.png</albedo_map>
+              <metalness>0.0</metalness>
+              <roughness>1.0</roughness>
             </metal>
           </pbr>
         </material>

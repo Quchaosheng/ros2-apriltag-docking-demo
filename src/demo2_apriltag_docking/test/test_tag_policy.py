@@ -1,13 +1,12 @@
 import math
 
-import pytest
-
 from demo2_apriltag_docking.tag_policy import (
     Detection,
     DockSpec,
-    TagGate,
     load_dock_specs,
+    TagGate,
 )
+import pytest
 
 
 def make_detection(
@@ -182,3 +181,22 @@ def test_reports_tag_loss_after_timeout(gate):
 
     assert gate.loss_reason(now=1.5) is None
     assert gate.loss_reason(now=1.51) == 'TAG_LOST'
+
+
+def test_tag_loss_requires_confirmation_after_recovery(gate):
+    for now in (1.0, 1.1, 1.2):
+        gate.evaluate([make_detection(stamp=now)], now=now)
+
+    assert gate.loss_reason(now=1.8) == 'TAG_LOST'
+    assert gate.evaluate(
+        [make_detection(stamp=1.8)], now=1.8
+    ).reason == 'CONFIRMING'
+
+
+def test_recovery_resets_confirmation_before_loss_timer_runs(gate):
+    for now in (1.0, 1.1, 1.2):
+        gate.evaluate([make_detection(stamp=now)], now=now)
+
+    recovered = gate.evaluate([make_detection(stamp=1.8)], now=1.8)
+
+    assert recovered.reason == 'CONFIRMING'
