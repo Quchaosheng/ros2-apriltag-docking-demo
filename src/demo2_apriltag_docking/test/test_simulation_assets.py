@@ -1,6 +1,6 @@
+from pathlib import Path
 import struct
 import xml.etree.ElementTree as ET
-from pathlib import Path
 
 import yaml
 
@@ -20,11 +20,15 @@ def test_official_tag_texture_is_valid_png():
 
 def test_dock_model_references_tag_texture():
     root = ET.parse(PACKAGE / 'models/apriltag_dock/model.sdf').getroot()
-    uri = root.find('.//material/pbr/metal/workflow/albedo_map')
+    tag_visual = root.find(".//visual[@name='tag_visual']")
+    uri = tag_visual.find('./material/pbr/metal/albedo_map')
+    size = tag_visual.findtext('./geometry/box/size')
 
     assert root.find(".//model[@name='apriltag_dock']") is not None
     assert uri is not None
     assert uri.text.endswith('tag36_11_00000.png')
+    assert size == '0.002 0.20 0.20'
+    assert root.find('.//material/pbr/metal/workflow') is None
 
 
 def test_world_places_dock_at_database_pose():

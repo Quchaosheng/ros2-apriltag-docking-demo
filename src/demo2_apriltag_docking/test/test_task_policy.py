@@ -1,8 +1,15 @@
-import pytest
-
+from demo2_apriltag_docking import docking_task_bridge
 from demo2_apriltag_docking.docking_task_bridge import (
-    TaskPolicy,
     feedback_state_name,
+    TaskPolicy,
+)
+import pytest
+from rclpy.qos import (
+    DurabilityPolicy,
+    qos_check_compatible,
+    QoSCompatibility,
+    QoSProfile,
+    ReliabilityPolicy,
 )
 
 
@@ -82,3 +89,20 @@ def test_optional_guard_never_cancels_action():
 )
 def test_feedback_state_mapping(value, name):
     assert feedback_state_name(value) == name
+
+
+def test_guard_subscription_accepts_volatile_publishers():
+    publisher_qos = QoSProfile(
+        depth=1,
+        reliability=ReliabilityPolicy.RELIABLE,
+        durability=DurabilityPolicy.VOLATILE,
+    )
+
+    subscription_qos = docking_task_bridge.guard_qos_profile()
+    compatibility, _ = qos_check_compatible(
+        publisher_qos,
+        subscription_qos,
+    )
+
+    assert subscription_qos.durability == DurabilityPolicy.VOLATILE
+    assert compatibility != QoSCompatibility.ERROR

@@ -1,19 +1,18 @@
 import math
 
-import rclpy
-import yaml
 from apriltag_msgs.msg import AprilTagDetectionArray
+from demo2_apriltag_docking.monitor import make_status, shutdown_if_running
+from demo2_apriltag_docking.tag_policy import Detection, load_dock_specs, TagGate
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
 from geometry_msgs.msg import PoseStamped
+import rclpy
 from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.time import Time
 from std_msgs.msg import String
 from tf2_ros import Buffer, TransformException, TransformListener
-
-from demo2_apriltag_docking.monitor import make_status, shutdown_if_running
-from demo2_apriltag_docking.tag_policy import Detection, TagGate, load_dock_specs
+import yaml
 
 
 def to_policy_detection(message, transform, stamp):
@@ -42,6 +41,20 @@ def metadata_only(message, stamp):
         y=0.0,
         yaw=0.0,
     )
+
+
+def lookup_tag_transform(buffer, target_frame, tag_frame):
+    return buffer.lookup_transform(target_frame, tag_frame, Time())
+
+
+def to_pose_message(transform):
+    pose = PoseStamped()
+    pose.header = transform.header
+    pose.pose.position.x = transform.transform.translation.x
+    pose.pose.position.y = transform.transform.translation.y
+    pose.pose.position.z = transform.transform.translation.z
+    pose.pose.orientation = transform.transform.rotation
+    return pose
 
 
 class TagPoseBridge(Node):
@@ -73,8 +86,6 @@ class TagPoseBridge(Node):
                 float(self.get_parameter('max_yaw_jump_deg').value)
             ),
         )
-        self.tf_timeout = float(self.get_parameter('tf_timeout').value)
-
         state_qos = QoSProfile(
             depth=1,
             reliability=ReliabilityPolicy.RELIABLE,
@@ -121,7 +132,6 @@ class TagPoseBridge(Node):
             'loss_timeout': 0.5,
             'max_translation_jump': 0.25,
             'max_yaw_jump_deg': 20.0,
-            'tf_timeout': 0.2,
         }
         for name, value in defaults.items():
             self.declare_parameter(name, value)
@@ -151,11 +161,10 @@ class TagPoseBridge(Node):
             return
 
         try:
-            transform = self.tf_buffer.lookup_transform(
+            transform = lookup_tag_transform(
+                self.tf_buffer,
                 message.header.frame_id,
                 dock.tag_frame,
-                Time.from_msg(message.header.stamp),
-                timeout=Duration(seconds=self.tf_timeout),
             )
         except TransformException as exc:
             self._report(
@@ -165,16 +174,14 @@ class TagPoseBridge(Node):
             )
             return
 
-        detection = to_policy_detection(tag_message, transform, stamp)
+        transform_stamp = (
+            transform.header.stamp.sec
+            + transform.header.stamp.nanosec * 1e-9
+        )
+        detection = to_policy_detection(tag_message, transform, transform_stamp)
         result = self.gate.evaluate([detection], now)
         if result.accepted:
-            pose = PoseStamped()
-            pose.header = message.header
-            pose.pose.position.x = transform.transform.translation.x
-            pose.pose.position.y = transform.transform.translation.y
-            pose.pose.position.z = transform.transform.translation.z
-            pose.pose.orientation = transform.transform.rotation
-            self.pose_publisher.publish(pose)
+            self.pose_publisher.publish(to_pose_message(transform))
             self._report(
                 'ACCEPTED',
                 DiagnosticStatus.OK,
