@@ -12,7 +12,7 @@ from rclpy.time import Time
 from std_msgs.msg import String
 from tf2_ros import Buffer, TransformException, TransformListener
 
-from demo2_apriltag_docking.monitor import make_status
+from demo2_apriltag_docking.monitor import make_status, shutdown_if_running
 from demo2_apriltag_docking.tag_policy import Detection, TagGate, load_dock_specs
 
 
@@ -238,7 +238,7 @@ def main(args=None):
     finally:
         if node is not None:
             node.destroy_node()
-        rclpy.shutdown()
+        shutdown_if_running()
 
 
 if __name__ == '__main__':

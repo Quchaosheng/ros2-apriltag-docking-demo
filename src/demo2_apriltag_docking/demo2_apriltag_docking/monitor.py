@@ -1,3 +1,4 @@
+import rclpy
 from diagnostic_msgs.msg import DiagnosticStatus, KeyValue
 
 
@@ -12,3 +13,8 @@ def make_status(node_name, level, message, values):
         for key, value in values.items()
     ]
     return status
+
+
+def shutdown_if_running():
+    if rclpy.ok():
+        rclpy.shutdown()
