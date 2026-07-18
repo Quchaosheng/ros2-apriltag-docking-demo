@@ -28,6 +28,7 @@ setup(
             ('share/' + package_name + '/launch', glob('launch/*.launch.py')),
         ]
         + package_data('models')
+        + package_data('maps')
         + package_data('worlds')
     ),
     install_requires=['setuptools'],

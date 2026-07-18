@@ -29,6 +29,7 @@ def test_apriltag_detector_uses_expected_family_and_size():
     assert parameters['size'] == 0.16
     assert parameters['max_hamming'] == 0
     assert parameters['pose_estimation_method'] == 'pnp'
+    assert parameters['detector']['debug'] is False
     assert 'tag.ids' not in parameters
 
 
