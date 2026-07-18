@@ -23,6 +23,12 @@ The project reuses `opennav_docking::SimpleChargingDock`. Custom code is limited
 - Three-frame confirmation, publication rate limiting, Tag loss, and pose-jump rejection.
 - Guard, DockRobot Action, and diagnostic integration.
 
+## Demo Video
+
+[![AprilTag docking demo](docs/demo/apriltag_docking_demo.png)](docs/demo/apriltag_docking_demo.mp4)
+
+The recording shows a live Gazebo camera feed, AprilTag validation, Nav2 staging, visual recovery, and a successful docking result.
+
 ## Platform
 
 - Ubuntu 24.04
