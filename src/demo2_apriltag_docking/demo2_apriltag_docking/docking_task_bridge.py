@@ -45,13 +45,24 @@ class TaskPolicy:
     def can_start(self, now):
         if self.action_active:
             return False, 'ALREADY_ACTIVE'
-        if not self.guard_required:
-            return True, 'READY'
-        if self.guard_allowed is not True or self.guard_stamp is None:
-            return False, 'GUARD_DENIED'
-        if now - self.guard_stamp > self.guard_timeout:
-            return False, 'GUARD_STALE'
+        reason = self._guard_reason(now)
+        if reason:
+            return False, reason
         return True, 'READY'
+
+    def cancel_reason(self, now):
+        if not self.action_active:
+            return None
+        return self._guard_reason(now)
+
+    def _guard_reason(self, now):
+        if not self.guard_required:
+            return None
+        if self.guard_allowed is not True or self.guard_stamp is None:
+            return 'GUARD_DENIED'
+        if now - self.guard_stamp > self.guard_timeout:
+            return 'GUARD_STALE'
+        return None
 
 
 class DockingTaskBridge(Node):
@@ -119,8 +130,9 @@ class DockingTaskBridge(Node):
             self._on_cancel,
         )
         self._goal_handle = None
-        self._guard_cancel_requested = False
+        self._guard_cancel_reason = None
         self._last_state = None
+        self.guard_timer = self.create_timer(0.1, self._check_guard)
         self._publish_state('IDLE', DiagnosticStatus.OK)
 
     def _declare_parameters(self):
@@ -160,7 +172,7 @@ class DockingTaskBridge(Node):
         goal.navigate_to_staging_pose = self.navigate_to_staging_pose
 
         self.policy.action_active = True
-        self._guard_cancel_requested = False
+        self._guard_cancel_reason = None
         future = self.action_client.send_goal_async(
             goal,
             feedback_callback=self._on_feedback,
@@ -187,16 +199,14 @@ class DockingTaskBridge(Node):
 
     def _on_guard(self, message):
         self.policy.update_guard(message.data, self._now_seconds())
-        if (
-            self.policy.guard_required
-            and not message.data
-            and self.policy.action_active
-            and self._goal_handle is not None
-            and not self._guard_cancel_requested
-        ):
-            self._guard_cancel_requested = True
+        self._check_guard()
+
+    def _check_guard(self):
+        reason = self.policy.cancel_reason(self._now_seconds())
+        if reason and self._goal_handle is not None and self._guard_cancel_reason is None:
+            self._guard_cancel_reason = reason
             self._goal_handle.cancel_goal_async()
-            self._publish_state('GUARD_DENIED', DiagnosticStatus.ERROR)
+            self._publish_state(reason, DiagnosticStatus.ERROR)
 
     def _on_goal_response(self, future):
         goal_handle = future.result()
@@ -205,6 +215,7 @@ class DockingTaskBridge(Node):
             self._publish_state('FAILED', DiagnosticStatus.ERROR, {'reason': 'REJECTED'})
             return
         self._goal_handle = goal_handle
+        self._check_guard()
         result_future = goal_handle.get_result_async()
         result_future.add_done_callback(self._on_result)
 
@@ -221,7 +232,7 @@ class DockingTaskBridge(Node):
         wrapped = future.result()
         result = wrapped.result
         if wrapped.status == GoalStatus.STATUS_CANCELED:
-            state = 'GUARD_DENIED' if self._guard_cancel_requested else 'CANCELED'
+            state = self._guard_cancel_reason or 'CANCELED'
             level = DiagnosticStatus.WARN
         elif result.success:
             state = 'SUCCEEDED'
@@ -264,6 +275,8 @@ def main(args=None):
     try:
         node = DockingTaskBridge()
         rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
     except (OSError, ValueError, yaml.YAMLError) as exc:
         if node is not None:
             node.get_logger().fatal(str(exc))
