@@ -1,4 +1,6 @@
+import ast
 from pathlib import Path
+import shlex
 import struct
 import xml.etree.ElementTree as ET
 
@@ -65,4 +67,55 @@ def test_launch_file_is_valid_python():
     assert 'opennav_docking::SimpleChargingDock' in nav2_source
     assert "package='ros_gz_sim'" in source
     assert "executable='create'" in source
-    assert "['-r -s -v2 \"', world, '\"']" in source
+
+
+def test_gazebo_server_uses_fixed_seed():
+    source = (PACKAGE / 'launch/demo.launch.py').read_text(encoding='utf-8')
+    gz_server_assignments = [
+        node
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == 'gz_server'
+            for target in node.targets
+        )
+    ]
+
+    assert len(gz_server_assignments) == 1
+    gz_server_call = gz_server_assignments[0].value
+    assert isinstance(gz_server_call, ast.Call)
+    assert isinstance(gz_server_call.func, ast.Name)
+    assert gz_server_call.func.id == 'IncludeLaunchDescription'
+
+    launch_arguments = next(
+        keyword.value for keyword in gz_server_call.keywords
+        if keyword.arg == 'launch_arguments'
+    )
+    assert isinstance(launch_arguments, ast.Call)
+    assert isinstance(launch_arguments.func, ast.Attribute)
+    assert launch_arguments.func.attr == 'items'
+    arguments_dict = launch_arguments.func.value
+    assert isinstance(arguments_dict, ast.Dict)
+
+    server_args = next(
+        value
+        for key, value in zip(arguments_dict.keys, arguments_dict.values)
+        if isinstance(key, ast.Constant) and key.value == 'gz_args'
+    )
+    assert isinstance(server_args, ast.List)
+
+    parts = []
+    world_references = 0
+    for value in server_args.elts:
+        if isinstance(value, ast.Constant) and isinstance(value.value, str):
+            parts.append(value.value)
+        elif isinstance(value, ast.Name) and value.id == 'world':
+            parts.append('/tmp/world.sdf')
+            world_references += 1
+        else:
+            raise AssertionError(f'Unexpected gz_server argument: {ast.dump(value)}')
+
+    assert world_references == 1
+    assert shlex.split(''.join(parts)) == [
+        '-r', '-s', '-v2', '--seed', '42', '/tmp/world.sdf',
+    ]
