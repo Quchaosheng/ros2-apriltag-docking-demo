@@ -4,6 +4,7 @@ from apriltag_msgs.msg import AprilTagDetection
 from diagnostic_msgs.msg import DiagnosticStatus
 from geometry_msgs.msg import TransformStamped
 
+from demo2_apriltag_docking import monitor
 from demo2_apriltag_docking.monitor import make_status
 from demo2_apriltag_docking.tag_pose_bridge import to_policy_detection
 
@@ -47,3 +48,17 @@ def test_to_policy_detection_uses_tf_translation_and_wrapped_yaw():
     assert detection.x == 1.2
     assert detection.y == -0.3
     assert math.isclose(detection.yaw, math.pi / 2.0)
+
+
+def test_shutdown_only_runs_for_active_context(monkeypatch):
+    calls = []
+    monkeypatch.setattr(monitor.rclpy, 'ok', lambda: False)
+    monkeypatch.setattr(monitor.rclpy, 'shutdown', lambda: calls.append('shutdown'))
+
+    monitor.shutdown_if_running()
+
+    assert calls == []
+
+    monkeypatch.setattr(monitor.rclpy, 'ok', lambda: True)
+    monitor.shutdown_if_running()
+    assert calls == ['shutdown']
