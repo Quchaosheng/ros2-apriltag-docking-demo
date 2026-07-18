@@ -230,6 +230,8 @@ def main(args=None):
     try:
         node = TagPoseBridge()
         rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
     except (OSError, ValueError, yaml.YAMLError) as exc:
         if node is not None:
             node.get_logger().fatal(str(exc))
