@@ -37,6 +37,7 @@ def guard_qos_profile():
 
 
 class TaskPolicy:
+
     def __init__(self, *, guard_required, guard_timeout):
         self.guard_required = guard_required
         self.guard_timeout = guard_timeout
@@ -72,6 +73,7 @@ class TaskPolicy:
 
 
 class DockingTaskBridge(Node):
+
     def __init__(self):
         super().__init__('docking_task_bridge')
         self._declare_parameters()
