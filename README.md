@@ -1,5 +1,7 @@
 # ROS 2 AprilTag Docking Demo
 
+[![ROS 2 CI](https://github.com/Quchaosheng/ros2-apriltag-docking-demo/actions/workflows/ros2-ci.yml/badge.svg?branch=main)](https://github.com/Quchaosheng/ros2-apriltag-docking-demo/actions/workflows/ros2-ci.yml)
+
 A Gazebo demo that drives a TurtleBot3 to a charging-dock staging pose, validates a live AprilTag detection, and completes the final approach with the Nav2 Docking Framework.
 
 ## Architecture
@@ -50,6 +52,7 @@ sudo apt install -y \
   ros-jazzy-nav2-bringup \
   ros-jazzy-opennav-docking \
   ros-jazzy-apriltag-ros \
+  ros-jazzy-apriltag-msgs \
   ros-jazzy-ros-gz-sim \
   ros-jazzy-ros-gz-image \
   ros-jazzy-turtlebot3-gazebo \
