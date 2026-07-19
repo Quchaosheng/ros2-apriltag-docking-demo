@@ -58,6 +58,7 @@ def to_pose_message(transform):
 
 
 class TagPoseBridge(Node):
+
     def __init__(self):
         super().__init__('tag_pose_bridge')
         self._declare_parameters()

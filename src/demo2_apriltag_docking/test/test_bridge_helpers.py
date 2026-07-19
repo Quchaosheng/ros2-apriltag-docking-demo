@@ -52,6 +52,7 @@ def test_to_policy_detection_uses_tf_translation_and_wrapped_yaw():
 
 def test_lookup_tag_transform_uses_cached_latest_tf():
     class Buffer:
+
         def lookup_transform(self, *args, **kwargs):
             self.args = args
             self.kwargs = kwargs
