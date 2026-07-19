@@ -45,6 +45,15 @@ def test_nav2_docking_uses_external_pose_and_bounded_retries():
     assert plugin['staging_x_offset'] == -1.2
 
 
+def test_docking_configs_use_reliable_contact_threshold_and_retry_limit():
+    for name in ('nav2_docking.yaml', 'turtlebot3_waffle_pi_nav2.yaml'):
+        parameters = load(name)['docking_server']['ros__parameters']
+        plugin = parameters['charging_dock']
+
+        assert parameters['max_retries'] == 2
+        assert plugin['docking_threshold'] == 0.10
+
+
 def test_dock_database_uses_same_dock_id_and_type():
     dock = load('dock_database.yaml')['docks']['demo_charge_dock']
 
