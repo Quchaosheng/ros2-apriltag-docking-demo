@@ -13,6 +13,8 @@ jobs:
       - uses: ros-tooling/setup-ros@v0.7
         with:
           required-ros-distributions: jazzy
+      - name: Install AprilTag message package
+        run: sudo apt-get update && sudo apt-get install -y ros-jazzy-apriltag-msgs
       - uses: ros-tooling/action-ros-ci@v0.4
         env:
           LD_LIBRARY_PATH: /opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/lib
