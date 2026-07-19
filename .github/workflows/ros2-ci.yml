@@ -14,6 +14,8 @@ jobs:
         with:
           required-ros-distributions: jazzy
       - uses: ros-tooling/action-ros-ci@v0.4
+        env:
+          LD_LIBRARY_PATH: /opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/lib
         with:
           package-name: demo2_apriltag_docking
           target-ros2-distro: jazzy
