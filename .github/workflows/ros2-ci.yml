@@ -15,6 +15,8 @@ jobs:
           required-ros-distributions: jazzy
       - name: Install AprilTag message package
         run: sudo apt-get update && sudo apt-get install -y ros-jazzy-apriltag-msgs
+      - name: Check bilingual documentation
+        run: python3 tests/test_docs.py
       - uses: ros-tooling/action-ros-ci@v0.4
         env:
           LD_LIBRARY_PATH: /opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/lib

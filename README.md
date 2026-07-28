@@ -1,5 +1,7 @@
 # ROS 2 AprilTag Docking Demo
 
+**English** | [简体中文](README.zh-CN.md)
+
 [![ROS 2 CI](https://github.com/Quchaosheng/ros2-apriltag-docking-demo/actions/workflows/ros2-ci.yml/badge.svg?branch=main)](https://github.com/Quchaosheng/ros2-apriltag-docking-demo/actions/workflows/ros2-ci.yml)
 
 A Gazebo demo that drives a TurtleBot3 to a charging-dock staging pose, validates a live AprilTag detection, and completes the final approach with the Nav2 Docking Framework.
