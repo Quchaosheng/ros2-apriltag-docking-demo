@@ -2,8 +2,8 @@
 
 [English](README.md) | **简体中文**
 
-这是一个 Gazebo 演示：驱动 TurtleBot3 到充电桩前的 staging 位姿，验证实时
-AprilTag 检测，再使用 Nav2 Docking Framework 完成最后的对接。
+这是一个基于 Gazebo 的可复现对接流程：TurtleBot3 先到达充电桩前的 staging
+位姿，系统确认实时 AprilTag 观测后，再由 Nav2 Docking Framework 完成最终接近。
 
 ## 架构
 
