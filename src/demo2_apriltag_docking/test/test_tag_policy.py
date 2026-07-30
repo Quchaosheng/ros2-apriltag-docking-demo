@@ -125,6 +125,22 @@ def test_requires_three_consecutive_frames(gate, dock):
     assert third.dock == dock
 
 
+def test_tag_switch_requires_three_new_confirmations(gate):
+    other_dock = DockSpec(1, 'backup_dock', 'charging_dock', 'tag36h11:1')
+    gate.specs[1] = other_dock
+    for now in (1.0, 1.1, 1.2):
+        gate.evaluate([make_detection(tag_id=0, stamp=now)], now=now)
+
+    first = gate.evaluate([make_detection(tag_id=1, stamp=1.4)], now=1.4)
+    second = gate.evaluate([make_detection(tag_id=1, stamp=1.5)], now=1.5)
+    third = gate.evaluate([make_detection(tag_id=1, stamp=1.6)], now=1.6)
+
+    assert first.reason == 'CONFIRMING'
+    assert second.reason == 'CONFIRMING'
+    assert third.accepted is True
+    assert third.dock == other_dock
+
+
 def test_confirmation_window_restarts(gate):
     assert gate.evaluate([make_detection(stamp=1.0)], now=1.0).reason == 'CONFIRMING'
     assert gate.evaluate([make_detection(stamp=1.1)], now=1.1).reason == 'CONFIRMING'
