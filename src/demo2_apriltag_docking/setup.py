@@ -42,6 +42,7 @@ setup(
         'console_scripts': [
             'tag_pose_bridge = demo2_apriltag_docking.tag_pose_bridge:main',
             'docking_task_bridge = demo2_apriltag_docking.docking_task_bridge:main',
+            'analyze_docking_bag = demo2_apriltag_docking.bag_quality:main',
         ],
     },
 )
