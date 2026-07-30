@@ -4,31 +4,50 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ros2-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   jazzy:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ros-tooling/setup-ros@v0.7
         with:
           required-ros-distributions: jazzy
-      - name: Install AprilTag message package
-        run: sudo apt-get update && sudo apt-get install -y ros-jazzy-apriltag-msgs
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3-colcon-common-extensions \
+            python3-rosdep \
+            ros-jazzy-apriltag-msgs
+          rosdep update
+          rosdep install --from-paths src --ignore-src \
+            --rosdistro jazzy -r -y
+
       - name: Check bilingual documentation
         run: python3 tests/test_docs.py
-      - uses: ros-tooling/action-ros-ci@v0.4
-        env:
-          LD_LIBRARY_PATH: /opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/lib
-        with:
-          package-name: demo2_apriltag_docking
-          target-ros2-distro: jazzy
-          colcon-defaults: |
-            {
-              "build": {
-                "symlink-install": true
-              },
-              "test": {
-                "event-handlers": ["console_direct+"]
-              }
-            }
+
+      - name: Build package
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          colcon build --packages-select demo2_apriltag_docking \
+            --symlink-install --event-handlers console_direct+
+
+      - name: Test package
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          source install/setup.bash
+          colcon test --packages-select demo2_apriltag_docking \
+            --event-handlers console_direct+ --return-code-on-test-failure
+          colcon test-result --test-result-base build --verbose
