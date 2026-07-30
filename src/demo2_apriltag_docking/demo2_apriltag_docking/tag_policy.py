@@ -116,6 +116,9 @@ class TagGate:
         if self._is_pose_jump(detection):
             return self._reject('POSE_JUMP')
 
+        if self._confirmed and self._active_tag_id != detection.tag_id:
+            self._reset_confirmation()
+
         if not self._confirmed:
             expired = (
                 self._confirmation_started is None
