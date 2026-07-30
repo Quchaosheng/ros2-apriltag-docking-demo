@@ -45,6 +45,16 @@ def test_nav2_docking_uses_external_pose_and_bounded_retries():
     assert plugin['staging_x_offset'] == -1.2
 
 
+def test_tag_bridge_requires_fresh_calibrated_observations_by_default():
+    parameters = load('nav2_docking.yaml')['tag_pose_bridge']['ros__parameters']
+
+    assert parameters['camera_info_topic'] == '/camera/camera_info'
+    assert parameters['require_camera_calibration'] is True
+    assert parameters['max_detection_age'] == 0.25
+    assert parameters['max_tf_age'] == 0.25
+    assert parameters['max_future_skew'] == 0.05
+
+
 def test_docking_configs_use_reliable_contact_threshold_and_retry_limit():
     for name in ('nav2_docking.yaml', 'turtlebot3_waffle_pi_nav2.yaml'):
         parameters = load(name)['docking_server']['ros__parameters']
