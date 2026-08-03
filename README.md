@@ -4,7 +4,10 @@
 
 [![ROS 2 CI](https://github.com/Quchaosheng/ros2-apriltag-docking-demo/actions/workflows/ros2-ci.yml/badge.svg?branch=main)](https://github.com/Quchaosheng/ros2-apriltag-docking-demo/actions/workflows/ros2-ci.yml)
 
-A reproducible Gazebo docking workflow that guides a TurtleBot3 to a charging-dock staging pose, validates live AprilTag observations, and delegates the final approach to the Nav2 Docking Framework.
+A reproducible Gazebo docking workflow that guides a TurtleBot3 to a charging-dock staging pose,
+validates live AprilTag observations, and delegates the final approach to the Nav2 Docking
+Framework. The project configures and reuses `opennav_docking::SimpleChargingDock`; it does not
+reimplement Nav2's final-approach controller.
 
 ## Architecture
 
@@ -23,7 +26,7 @@ flowchart LR
 The project reuses `opennav_docking::SimpleChargingDock`. Custom code is limited to:
 
 - Tag ID to dock type mapping.
-- Low-confidence, unknown, and multiple-Tag rejection.
+- Low-confidence and unknown-Tag rejection, plus explicit handling of ambiguous multi-Tag views.
 - Three-frame confirmation, publication rate limiting, Tag loss, and pose-jump rejection.
 - Guard, DockRobot Action, and diagnostic integration.
 
@@ -43,6 +46,8 @@ The recording shows a live Gazebo camera feed, AprilTag validation, Nav2 staging
 - TurtleBot3 Waffle Pi
 
 The code has compatibility imports for ROS 2 Humble unit testing, but the complete simulation targets Jazzy.
+The supported full-demo combination is ROS 2 Jazzy on Ubuntu 24.04. Humble compatibility imports
+do not imply that the Gazebo/Nav2 workflow is release-qualified on Ubuntu 22.04.
 
 ## Install
 
@@ -94,6 +99,11 @@ Run without Gazebo or RViz windows:
 ros2 launch demo2_apriltag_docking demo.launch.py headless:=true rviz:=false
 ```
 
+`headless:=true` removes the Gazebo client window; it does not remove rendering requirements from
+camera simulation. A machine without a usable GPU may need software rendering and can run more
+slowly or fail because of local Gazebo/OGRE/driver configuration. Headless launch is therefore an
+execution mode, not evidence that the complete simulation is GPU-independent.
+
 ## Guard Integration
 
 The standalone demo uses `guard_required:=false`. To require a Guard heartbeat:
@@ -138,21 +148,13 @@ Tag states include `NO_TAG`, `UNKNOWN_TAG`, `LOW_MARGIN`, `HAMMING`, `MULTI_TAG`
 | Decision margin below 50 | Reject with `LOW_MARGIN` |
 | Hamming distance above 0 | Reject with `HAMMING` |
 | Unmapped Tag ID | Reject with `UNKNOWN_TAG` |
-| More than one visible Tag | Reject the frame with `MULTI_TAG` |
+| More than one visible Tag | Treat the observation as ambiguous and reject it with `MULTI_TAG` |
 | Translation jump above 0.25 m | Reject and restart three-frame confirmation |
 | Yaw jump above 20 degrees | Reject and restart three-frame confirmation |
-| No accepted sample for 0.5 s | Report `TAG_LOST`; Nav2 handles stale-pose timeout and retry |
+| No accepted sample for 0.5 s | Report `TAG_LOST`; stop publishing an accepted observation and allow Nav2's configured stale-pose/retry behavior to take effect |
 | Docking exceeds Nav2 timeout | Relay the DockRobot error and retry count |
 
 Tune thresholds in [`config/nav2_docking.yaml`](src/demo2_apriltag_docking/config/nav2_docking.yaml). Change Tag-to-dock mapping in [`config/docks.yaml`](src/demo2_apriltag_docking/config/docks.yaml).
-
-## Capture And Offline Analysis
-
-The Tag bridge rejects missing or invalid camera intrinsics plus stale or
-future-dated detection/TF data before it publishes a docking pose. The default
-freshness limits are 250 ms for both detection and TF, with 50 ms tolerated
-clock skew. See the [rosbag quality workflow](docs/rosbag-quality.md) for a
-repeatable capture and offline analysis command.
 
 ## Test
 
@@ -163,8 +165,20 @@ colcon test --event-handlers console_direct+
 colcon test-result --verbose
 ```
 
-The automated suite covers mapping validation, confidence gates, debounce, duplicate suppression, pose jumps, Tag loss, Guard policy, action feedback mapping, configuration contracts, SDF assets, map metadata, and Launch syntax.
+The automated suite covers mapping validation, confidence gates, three-frame confirmation,
+multi-Tag ambiguity, pose jumps, the 0.5 s Tag-loss transition, Guard policy, action feedback
+mapping, configuration contracts, SDF assets, map metadata, and launch-file syntax.
+
+There are currently no `launch_testing` integration tests that boot the complete Gazebo,
+`apriltag_ros`, Nav2, and docking-action graph and assert an end-to-end result. The recorded demo and
+manual run validate that workflow in the stated Jazzy/Ubuntu environment, while the automated suite
+primarily protects node-level policy and configuration contracts.
 
 ## Demo Scope
 
 This repository simulates successful charging with Nav2's distance-based `SimpleChargingDock` behavior. It does not implement physical contacts, battery-current sensing, motor-stall detection, Jetson acceleration, or production safety certification.
+
+Gazebo camera output and AprilTag detection performance depend on scene lighting, resolution,
+rendering backend, and available GPU or software-rendering capacity. The simulation demonstrates
+integration behavior; it does not establish real-camera detection range, latency, false-positive
+rate, or embedded-compute performance.
