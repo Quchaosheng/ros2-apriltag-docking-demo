@@ -4,8 +4,8 @@ from demo2_apriltag_docking.bag_quality import (
     CalibrationSample,
     DetectionSample,
     PoseSample,
-    TransformSample,
     summarize_observations,
+    TransformSample,
 )
 from demo2_apriltag_docking.quality_policy import validate_camera_calibration
 
