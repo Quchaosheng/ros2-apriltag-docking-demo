@@ -15,8 +15,8 @@ from pathlib import Path
 import re
 
 from demo2_apriltag_docking.quality_policy import (
-    CameraCalibration,
     camera_info_to_calibration,
+    CameraCalibration,
     pose_delta,
     validate_observation_timing,
     yaw_from_quaternion,
