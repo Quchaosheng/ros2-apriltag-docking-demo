@@ -101,6 +101,9 @@ docking_server:
       rotate_to_dock: false
       use_external_detection_pose: true
       external_detection_timeout: 0.8
+      # Fixed camera optical frame to dock frame transform convention.
+      # -0.20 is the x-axis pre-docking offset; +/-1.57 is approximately +/-pi/2.
+      # Re-validate orientation and docking results after changing camera mounting or frames.
       external_detection_translation_x: -0.20
       external_detection_translation_y: 0.0
       external_detection_rotation_yaw: 0.0
