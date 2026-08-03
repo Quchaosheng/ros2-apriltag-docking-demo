@@ -2,20 +2,20 @@ import math
 
 from apriltag_msgs.msg import AprilTagDetectionArray
 from demo2_apriltag_docking.monitor import make_status, shutdown_if_running
-from demo2_apriltag_docking.tag_policy import Detection, load_dock_specs, TagGate
-from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
-from geometry_msgs.msg import PoseStamped
 from demo2_apriltag_docking.quality_policy import (
     camera_info_to_calibration,
     validate_observation_timing,
 )
+from demo2_apriltag_docking.tag_policy import Detection, load_dock_specs, TagGate
+from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
+from geometry_msgs.msg import PoseStamped
 import rclpy
 from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.time import Time
-from std_msgs.msg import String
 from sensor_msgs.msg import CameraInfo
+from std_msgs.msg import String
 from tf2_ros import Buffer, TransformException, TransformListener
 import yaml
 
