@@ -146,6 +146,14 @@ Tag states include `NO_TAG`, `UNKNOWN_TAG`, `LOW_MARGIN`, `HAMMING`, `MULTI_TAG`
 
 Tune thresholds in [`config/nav2_docking.yaml`](src/demo2_apriltag_docking/config/nav2_docking.yaml). Change Tag-to-dock mapping in [`config/docks.yaml`](src/demo2_apriltag_docking/config/docks.yaml).
 
+## Capture And Offline Analysis
+
+The Tag bridge rejects missing or invalid camera intrinsics plus stale or
+future-dated detection/TF data before it publishes a docking pose. The default
+freshness limits are 250 ms for both detection and TF, with 50 ms tolerated
+clock skew. See the [rosbag quality workflow](docs/rosbag-quality.md) for a
+repeatable capture and offline analysis command.
+
 ## Test
 
 ```bash

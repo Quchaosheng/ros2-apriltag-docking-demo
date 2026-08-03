@@ -36,6 +36,7 @@ tag_pose_bridge:
   ros__parameters:
     use_sim_time: true
     detections_topic: /apriltag/detections
+    camera_info_topic: /camera/camera_info
     output_pose_topic: /detected_dock_pose
     state_topic: /demo2/tag_state
     min_decision_margin: 50.0
@@ -46,6 +47,10 @@ tag_pose_bridge:
     loss_timeout: 0.5
     max_translation_jump: 0.25
     max_yaw_jump_deg: 20.0
+    require_camera_calibration: true
+    max_detection_age: 0.25
+    max_tf_age: 0.25
+    max_future_skew: 0.05
 
 docking_task_bridge:
   ros__parameters:

@@ -2,6 +2,10 @@ import math
 
 from apriltag_msgs.msg import AprilTagDetectionArray
 from demo2_apriltag_docking.monitor import make_status, shutdown_if_running
+from demo2_apriltag_docking.quality_policy import (
+    camera_info_to_calibration,
+    validate_observation_timing,
+)
 from demo2_apriltag_docking.tag_policy import Detection, load_dock_specs, TagGate
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
 from geometry_msgs.msg import PoseStamped
@@ -10,6 +14,7 @@ from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.time import Time
+from sensor_msgs.msg import CameraInfo
 from std_msgs.msg import String
 from tf2_ros import Buffer, TransformException, TransformListener
 import yaml
@@ -55,6 +60,15 @@ def to_pose_message(transform):
     pose.pose.position.z = transform.transform.translation.z
     pose.pose.orientation = transform.transform.rotation
     return pose
+
+
+def temporal_values(timing):
+    values = {}
+    if timing.detection_age_ms is not None:
+        values['detection_age_ms'] = round(timing.detection_age_ms, 3)
+    if timing.tf_age_ms is not None:
+        values['tf_age_ms'] = round(timing.tf_age_ms, 3)
+    return values
 
 
 class TagPoseBridge(Node):
@@ -109,6 +123,12 @@ class TagPoseBridge(Node):
         )
         self.tf_buffer = Buffer(cache_time=Duration(seconds=10.0))
         self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.camera_info_subscription = self.create_subscription(
+            CameraInfo,
+            self.get_parameter('camera_info_topic').value,
+            self._on_camera_info,
+            10,
+        )
         self.subscription = self.create_subscription(
             AprilTagDetectionArray,
             self.get_parameter('detections_topic').value,
@@ -118,11 +138,13 @@ class TagPoseBridge(Node):
         self.loss_timer = self.create_timer(0.1, self._check_loss)
         self._last_state = None
         self._last_diagnostic_time = None
+        self._camera_calibration = None
 
     def _declare_parameters(self):
         defaults = {
             'dock_mapping_file': '',
             'detections_topic': '/apriltag/detections',
+            'camera_info_topic': '/camera/camera_info',
             'output_pose_topic': '/detected_dock_pose',
             'state_topic': '/demo2/tag_state',
             'min_decision_margin': 50.0,
@@ -133,9 +155,16 @@ class TagPoseBridge(Node):
             'loss_timeout': 0.5,
             'max_translation_jump': 0.25,
             'max_yaw_jump_deg': 20.0,
+            'require_camera_calibration': True,
+            'max_detection_age': 0.25,
+            'max_tf_age': 0.25,
+            'max_future_skew': 0.05,
         }
         for name, value in defaults.items():
             self.declare_parameter(name, value)
+
+    def _on_camera_info(self, message):
+        self._camera_calibration = camera_info_to_calibration(message)
 
     def _on_detections(self, message):
         now = self._now_seconds()
@@ -179,6 +208,34 @@ class TagPoseBridge(Node):
             transform.header.stamp.sec
             + transform.header.stamp.nanosec * 1e-9
         )
+        timing = validate_observation_timing(
+            now=now,
+            detection_stamp=stamp,
+            tf_stamp=transform_stamp,
+            max_detection_age=float(self.get_parameter('max_detection_age').value),
+            max_tf_age=float(self.get_parameter('max_tf_age').value),
+            max_future_skew=float(self.get_parameter('max_future_skew').value),
+        )
+        if not timing.accepted:
+            self._report(
+                timing.reason,
+                DiagnosticStatus.WARN,
+                temporal_values(timing),
+            )
+            return
+
+        if bool(self.get_parameter('require_camera_calibration').value):
+            calibration = self._camera_calibration
+            if calibration is None:
+                self._report('CALIBRATION_UNAVAILABLE', DiagnosticStatus.WARN)
+                return
+            if not calibration.valid:
+                self._report(
+                    'CALIBRATION_INVALID',
+                    DiagnosticStatus.WARN,
+                    {'reason': calibration.reason},
+                )
+                return
         detection = to_policy_detection(tag_message, transform, transform_stamp)
         result = self.gate.evaluate([detection], now)
         if result.accepted:
@@ -190,6 +247,7 @@ class TagPoseBridge(Node):
                     'tag_id': detection.tag_id,
                     'dock_id': result.dock.dock_id,
                     'margin': detection.decision_margin,
+                    **temporal_values(timing),
                 },
                 refresh_seconds=1.0,
             )
