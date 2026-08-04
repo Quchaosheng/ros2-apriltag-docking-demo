@@ -167,8 +167,12 @@ colcon test --event-handlers console_direct+
 colcon test-result --verbose
 ```
 
-自动化套件覆盖映射校验、置信度门槛、防抖、重复抑制、位姿跳变、Tag 丢失、
-Guard 策略、Action 反馈映射、配置契约、SDF 资源、地图元数据和 Launch 语法。
+自动化套件覆盖映射校验、置信度门槛、三帧确认、多 Tag 歧义、位姿跳变、
+0.5 s 的 Tag 丢失转移、Guard 策略、Action 反馈映射、配置契约、SDF 资源、
+地图元数据和 Launch 语法。
+
+当前没有会启动完整 Gazebo、`apriltag_ros`、Nav2 和 docking action graph 并断言端到端结果的
+`launch_testing` 仿真集成测试。录屏只能作为演示或人工运行证据，不能作为自动化测试证据。
 
 ## 演示范围
 
