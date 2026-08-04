@@ -51,6 +51,10 @@ AprilTag 会持续表现为 `NO_TAG`。
 `launch_testing` 级 release qualification。代码中的 ROS 2 Humble 兼容导入不表示
 Ubuntu 22.04 的完整仿真已经验证。
 
+姊妹仓库 `ros2-control-vcan-motor-demo` 目标是 Ubuntu 22.04 + ROS 2 Humble。
+两个 Demo 应使用不同环境或容器，不要在同一个已经 source 的 shell 中混用
+Humble 与 Jazzy 软件包。
+
 ## 安装
 
 ```bash
