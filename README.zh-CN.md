@@ -169,6 +169,11 @@ colcon test-result --verbose
 
 自动化套件覆盖映射校验、置信度门槛、防抖、重复抑制、位姿跳变、Tag 丢失、
 Guard 策略、Action 反馈映射、配置契约、SDF 资源、地图元数据和 Launch 语法。
+另有一个 `launch_testing` 集成测试会以无 GUI 模式启动完整 Gazebo、`apriltag_ros`、
+Nav2 和 docking action 图，并要求 `/detected_dock_pose` 发布、`tag_pose_bridge=ACCEPTED`
+诊断出现、docking bridge 进入初始 `IDLE` 状态。测试使用现有公开状态契约；本仓库没有
+单独发布名为 `CONFIRMED` 的 Guard 话题。该测试必须在指定的 Jazzy/Ubuntu 环境运行，
+当前 Windows 主机无法执行。
 
 ## 演示范围
 
