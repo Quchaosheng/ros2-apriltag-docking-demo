@@ -3,6 +3,7 @@ from demo2_apriltag_docking.docking_task_bridge import (
     feedback_state_name,
     TaskPolicy,
 )
+from diagnostic_msgs.msg import DiagnosticStatus
 import pytest
 from rclpy.qos import (
     DurabilityPolicy,
@@ -48,14 +49,14 @@ def test_stale_guard_denies_start():
 
 def test_active_action_rejects_duplicate_start():
     policy = TaskPolicy(guard_required=False, guard_timeout=2.0)
-    policy.action_active = True
+    policy.mark_active()
 
     assert policy.can_start(now=1.0) == (False, 'ALREADY_ACTIVE')
 
 
 def test_active_action_cancels_when_guard_turns_false():
     policy = TaskPolicy(guard_required=True, guard_timeout=2.0)
-    policy.action_active = True
+    policy.mark_active()
     policy.update_guard(False, stamp=1.0)
 
     assert policy.cancel_reason(now=1.0) == 'GUARD_DENIED'
@@ -63,7 +64,7 @@ def test_active_action_cancels_when_guard_turns_false():
 
 def test_active_action_cancels_when_guard_becomes_stale():
     policy = TaskPolicy(guard_required=True, guard_timeout=2.0)
-    policy.action_active = True
+    policy.mark_active()
     policy.update_guard(True, stamp=1.0)
 
     assert policy.cancel_reason(now=3.1) == 'GUARD_STALE'
@@ -71,9 +72,73 @@ def test_active_action_cancels_when_guard_becomes_stale():
 
 def test_optional_guard_never_cancels_action():
     policy = TaskPolicy(guard_required=False, guard_timeout=2.0)
-    policy.action_active = True
+    policy.mark_active()
 
     assert policy.cancel_reason(now=100.0) is None
+
+
+def test_action_state_is_managed_by_explicit_methods():
+    policy = TaskPolicy(guard_required=False, guard_timeout=2.0)
+
+    policy.mark_active()
+    assert policy.action_active is True
+
+    policy.mark_idle()
+    assert policy.action_active is False
+    assert TaskPolicy.action_active.fset is None
+
+
+class FailingFuture:
+
+    def __init__(self, error):
+        self.error = error
+
+    def result(self):
+        raise self.error
+
+
+def make_fake_bridge():
+    bridge = docking_task_bridge.DockingTaskBridge.__new__(
+        docking_task_bridge.DockingTaskBridge
+    )
+    bridge.policy = TaskPolicy(guard_required=False, guard_timeout=2.0)
+    bridge.policy.mark_active()
+    bridge._goal_handle = object()
+    bridge.published_states = []
+    bridge._publish_state = lambda *args: bridge.published_states.append(args)
+    return bridge
+
+
+def test_goal_response_future_error_clears_action_and_reports_failure():
+    bridge = make_fake_bridge()
+
+    bridge._on_goal_response(FailingFuture(RuntimeError('send failed')))
+
+    assert bridge.policy.action_active is False
+    assert bridge._goal_handle is None
+    assert bridge.published_states == [
+        (
+            'FAILED',
+            DiagnosticStatus.ERROR,
+            {'reason': 'GOAL_RESPONSE_ERROR', 'error_msg': 'send failed'},
+        )
+    ]
+
+
+def test_result_future_error_clears_action_and_reports_failure():
+    bridge = make_fake_bridge()
+
+    bridge._on_result(FailingFuture(RuntimeError('result failed')))
+
+    assert bridge.policy.action_active is False
+    assert bridge._goal_handle is None
+    assert bridge.published_states == [
+        (
+            'FAILED',
+            DiagnosticStatus.ERROR,
+            {'reason': 'RESULT_ERROR', 'error_msg': 'result failed'},
+        )
+    ]
 
 
 @pytest.mark.parametrize(
