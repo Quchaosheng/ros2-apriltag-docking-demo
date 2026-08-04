@@ -178,13 +178,13 @@ colcon test-result --verbose
 
 The automated suite covers mapping validation, confidence gates, three-frame confirmation,
 multi-Tag ambiguity, pose jumps, the 0.5 s Tag-loss transition, Guard policy, action feedback
-mapping, configuration contracts, SDF assets, map metadata, and launch-file syntax.
-
-There are currently no `launch_testing` integration tests that boot the complete Gazebo,
-`apriltag_ros`, Nav2, and docking-action graph and assert an end-to-end result. The recorded demo and
-manual run validate that workflow in the stated Jazzy/Ubuntu environment, while the automated suite
-primarily protects node-level policy and configuration contracts. The recording is demonstration
-evidence, not automated test evidence.
+mapping, configuration contracts, SDF assets, map metadata, and launch-file syntax. It also
+contains one `launch_testing` integration test that boots the complete Gazebo, `apriltag_ros`,
+Nav2, and docking-action graph in headless mode, then requires `/detected_dock_pose`, a
+`tag_pose_bridge=ACCEPTED` diagnostic, and the docking bridge's initial `IDLE` state. The test
+uses the existing public state contract: this repository does not publish a separate
+`CONFIRMED` Guard topic. The test must be run on the stated Jazzy/Ubuntu environment; it is
+not executable on this Windows host.
 
 ## Development Workflow
 
