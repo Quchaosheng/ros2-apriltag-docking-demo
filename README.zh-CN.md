@@ -46,7 +46,10 @@ flowchart LR
 `headless:=true` 只隐藏 GUI；相机仿真仍需要可用 GPU 或软件渲染后端。如果相机没有输出，
 AprilTag 会持续表现为 `NO_TAG`。
 
-代码包含 ROS 2 Humble 单元测试兼容导入，但完整仿真目标是 Jazzy。
+仓库面向 Ubuntu 24.04 + ROS 2 Jazzy 的人工完整演示环境。CI 当前主要覆盖
+节点级与契约测试，未对完整 Gazebo/AprilTag/Nav2 启动图做
+`launch_testing` 级 release qualification。代码中的 ROS 2 Humble 兼容导入不表示
+Ubuntu 22.04 的完整仿真已经验证。
 
 ## 安装
 
