@@ -43,7 +43,17 @@ class TaskPolicy:
         self.guard_timeout = guard_timeout
         self.guard_allowed = None
         self.guard_stamp = None
-        self.action_active = False
+        self._action_active = False
+
+    @property
+    def action_active(self):
+        return self._action_active
+
+    def mark_active(self):
+        self._action_active = True
+
+    def mark_idle(self):
+        self._action_active = False
 
     def update_guard(self, allowed, stamp):
         self.guard_allowed = bool(allowed)
@@ -179,7 +189,7 @@ class DockingTaskBridge(Node):
         goal.max_staging_time = self.max_staging_time
         goal.navigate_to_staging_pose = self.navigate_to_staging_pose
 
-        self.policy.action_active = True
+        self.policy.mark_active()
         self._guard_cancel_reason = None
         future = self.action_client.send_goal_async(
             goal,
@@ -217,9 +227,20 @@ class DockingTaskBridge(Node):
             self._publish_state(reason, DiagnosticStatus.ERROR)
 
     def _on_goal_response(self, future):
-        goal_handle = future.result()
+        try:
+            goal_handle = future.result()
+        except Exception as exc:
+            self.policy.mark_idle()
+            self._goal_handle = None
+            self._publish_state(
+                'FAILED',
+                DiagnosticStatus.ERROR,
+                {'reason': 'GOAL_RESPONSE_ERROR', 'error_msg': str(exc)},
+            )
+            return
         if not goal_handle.accepted:
-            self.policy.action_active = False
+            self.policy.mark_idle()
+            self._goal_handle = None
             self._publish_state('FAILED', DiagnosticStatus.ERROR, {'reason': 'REJECTED'})
             return
         self._goal_handle = goal_handle
@@ -237,7 +258,17 @@ class DockingTaskBridge(Node):
         )
 
     def _on_result(self, future):
-        wrapped = future.result()
+        try:
+            wrapped = future.result()
+        except Exception as exc:
+            self.policy.mark_idle()
+            self._goal_handle = None
+            self._publish_state(
+                'FAILED',
+                DiagnosticStatus.ERROR,
+                {'reason': 'RESULT_ERROR', 'error_msg': str(exc)},
+            )
+            return
         result = wrapped.result
         if wrapped.status == GoalStatus.STATUS_CANCELED:
             state = self._guard_cancel_reason or 'CANCELED'
@@ -249,7 +280,7 @@ class DockingTaskBridge(Node):
             state = 'FAILED'
             level = DiagnosticStatus.ERROR
 
-        self.policy.action_active = False
+        self.policy.mark_idle()
         self._goal_handle = None
         self._publish_state(
             state,
