@@ -45,6 +45,11 @@ The recording shows a live Gazebo camera feed, AprilTag validation, Nav2 staging
 - Gazebo Harmonic through `ros_gz`
 - TurtleBot3 Waffle Pi
 
+The complete Gazebo/AprilTag/Nav2 simulation target is Ubuntu 24.04 + ROS 2 Jazzy + Gazebo
+Harmonic. `headless:=true` hides only the GUI; camera simulation still requires a usable GPU or a
+software-rendering backend. If the camera produces no output, AprilTag will appear as a continuous
+`NO_TAG` state.
+
 The code has compatibility imports for ROS 2 Humble unit testing, but the complete simulation targets Jazzy.
 The supported full-demo combination is ROS 2 Jazzy on Ubuntu 24.04. Humble compatibility imports
 do not imply that the Gazebo/Nav2 workflow is release-qualified on Ubuntu 22.04.
@@ -172,7 +177,12 @@ mapping, configuration contracts, SDF assets, map metadata, and launch-file synt
 There are currently no `launch_testing` integration tests that boot the complete Gazebo,
 `apriltag_ros`, Nav2, and docking-action graph and assert an end-to-end result. The recorded demo and
 manual run validate that workflow in the stated Jazzy/Ubuntu environment, while the automated suite
-primarily protects node-level policy and configuration contracts.
+primarily protects node-level policy and configuration contracts. The recording is demonstration
+evidence, not automated test evidence.
+
+## Development Workflow
+
+This project combines direct implementation, upstream component integration, and AI-assisted iteration. Runtime capabilities are evidenced only by source code, tests, CI, simulation, or explicitly labeled hardware evidence; plans and generated text are not runtime evidence. Public Git history remains unchanged.
 
 ## Demo Scope
 

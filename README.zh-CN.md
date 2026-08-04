@@ -42,6 +42,10 @@ flowchart LR
 - 通过 `ros_gz` 使用 Gazebo Harmonic
 - TurtleBot3 Waffle Pi
 
+完整的 Gazebo/AprilTag/Nav2 仿真目标是 Ubuntu 24.04 + ROS 2 Jazzy + Gazebo Harmonic。
+`headless:=true` 只隐藏 GUI；相机仿真仍需要可用 GPU 或软件渲染后端。如果相机没有输出，
+AprilTag 会持续表现为 `NO_TAG`。
+
 代码包含 ROS 2 Humble 单元测试兼容导入，但完整仿真目标是 Jazzy。
 
 ## 安装
@@ -87,6 +91,9 @@ ros2 service call /demo2/cancel_docking std_srvs/srv/Trigger "{}"
 ```bash
 ros2 launch demo2_apriltag_docking demo.launch.py headless:=true rviz:=false
 ```
+
+当前仓库没有会启动完整 Gazebo、`apriltag_ros`、Nav2 和 docking action graph 并断言端到端结果的
+`launch_testing` 仿真集成测试。录屏只能作为演示或人工运行证据，不能作为自动化测试证据。
 
 ## Guard 集成
 
