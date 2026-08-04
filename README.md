@@ -50,9 +50,11 @@ Harmonic. `headless:=true` hides only the GUI; camera simulation still requires 
 software-rendering backend. If the camera produces no output, AprilTag will appear as a continuous
 `NO_TAG` state.
 
-The code has compatibility imports for ROS 2 Humble unit testing, but the complete simulation targets Jazzy.
-The supported full-demo combination is ROS 2 Jazzy on Ubuntu 24.04. Humble compatibility imports
-do not imply that the Gazebo/Nav2 workflow is release-qualified on Ubuntu 22.04.
+The repository targets a manual full-demo environment of ROS 2 Jazzy on Ubuntu
+24.04. CI currently covers node-level and contract tests; it does not
+release-qualify the complete Gazebo/AprilTag/Nav2 launch graph. Humble
+compatibility imports do not imply that the full simulation is validated on
+Ubuntu 22.04.
 
 ## Install
 
