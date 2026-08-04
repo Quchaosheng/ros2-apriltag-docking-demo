@@ -56,6 +56,10 @@ release-qualify the complete Gazebo/AprilTag/Nav2 launch graph. Humble
 compatibility imports do not imply that the full simulation is validated on
 Ubuntu 22.04.
 
+The sibling `ros2-control-vcan-motor-demo` targets Ubuntu 22.04 with ROS 2
+Humble. Use separate environments or containers for the two demos; do not mix
+Humble and Jazzy packages in one already-sourced shell.
+
 ## Install
 
 ```bash
