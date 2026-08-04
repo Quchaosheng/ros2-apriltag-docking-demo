@@ -12,7 +12,7 @@ import yaml
 
 try:
     from nav2_msgs.action import DockRobot
-except ImportError:  # Humble compatibility; Jazzy carries this action in nav2_msgs.
+except ImportError:  # Humble keeps DockRobot in opennav_docking_msgs; Jazzy uses nav2_msgs.
     from opennav_docking_msgs.action import DockRobot
 
 FEEDBACK_STATES = {

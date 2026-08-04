@@ -41,6 +41,11 @@ def test_nav2_docking_uses_external_pose_and_bounded_retries():
     assert plugin['plugin'] == 'opennav_docking::SimpleChargingDock'
     assert plugin['use_external_detection_pose'] is True
     assert plugin['external_detection_timeout'] == 0.8
+    assert plugin['external_detection_translation_x'] == -0.20
+    assert plugin['external_detection_translation_y'] == 0.0
+    assert plugin['external_detection_rotation_yaw'] == 0.0
+    assert plugin['external_detection_rotation_pitch'] == 1.57
+    assert plugin['external_detection_rotation_roll'] == -1.57
     assert plugin['use_battery_status'] is False
     assert plugin['staging_x_offset'] == -1.2
 
