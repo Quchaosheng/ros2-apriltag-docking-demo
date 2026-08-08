@@ -73,6 +73,10 @@ class TagGate:
         max_translation_jump,
         max_yaw_jump,
     ):
+        if not isinstance(specs, dict) or not specs:
+            raise ValueError('specs must be a non-empty mapping')
+        if not isinstance(min_margin, (int, float)) or not math.isfinite(min_margin):
+            raise ValueError('min_margin must be finite')
         if not isinstance(confirmations, int) or isinstance(confirmations, bool):
             raise ValueError('confirmations must be an int')
         if confirmations < 1:
@@ -85,9 +89,13 @@ class TagGate:
             ('max_translation_jump', max_translation_jump),
             ('max_yaw_jump', max_yaw_jump),
         ):
-            if value <= 0:
+            if not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
                 raise ValueError(f'{name} must be > 0')
-        if publish_period < 0:
+        if (
+            not isinstance(publish_period, (int, float))
+            or not math.isfinite(publish_period)
+            or publish_period < 0
+        ):
             raise ValueError('publish_period must be >= 0')
 
         self.specs = specs
