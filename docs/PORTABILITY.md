@@ -12,3 +12,9 @@ simulator, a bag-file evaluator, or a platform adapter.
 
 When adding a platform adapter, preserve the `Detection`, `DockSpec`, and
 `GateResult` contracts so the safety gate remains independently testable.
+
+On an ARM64 board with ROS 2 Jazzy installed, build natively with:
+
+```bash
+bash scripts/build_on_arm64.sh
+```
