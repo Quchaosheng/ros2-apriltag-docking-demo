@@ -258,6 +258,26 @@ def test_rejects_out_of_range_gate_parameters(dock, name, value):
 @pytest.mark.parametrize(
     'name,value',
     [
+        ('min_margin', math.nan),
+        ('min_margin', math.inf),
+        ('confirmation_window', math.inf),
+        ('loss_timeout', math.nan),
+        ('publish_period', math.inf),
+    ],
+)
+def test_rejects_non_finite_gate_parameters(dock, name, value):
+    with pytest.raises(ValueError, match=name):
+        TagGate(**gate_kwargs(dock, **{name: value}))
+
+
+def test_rejects_empty_specs(dock):
+    with pytest.raises(ValueError, match='specs'):
+        TagGate(**gate_kwargs(dock, specs={}))
+
+
+@pytest.mark.parametrize(
+    'name,value',
+    [
         ('confirmations', 1),
         ('max_hamming', 0),
         ('publish_period', 0.0),
