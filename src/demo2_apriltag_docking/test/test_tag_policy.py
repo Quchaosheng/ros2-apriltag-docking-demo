@@ -200,3 +200,52 @@ def test_recovery_resets_confirmation_before_loss_timer_runs(gate):
     recovered = gate.evaluate([make_detection(stamp=1.8)], now=1.8)
 
     assert recovered.reason == 'CONFIRMING'
+
+
+def gate_kwargs(dock, **overrides):
+    kwargs = {
+        'specs': {0: dock},
+        'min_margin': 50.0,
+        'max_hamming': 0,
+        'confirmations': 3,
+        'confirmation_window': 0.5,
+        'publish_period': 0.1,
+        'loss_timeout': 0.5,
+        'max_translation_jump': 0.25,
+        'max_yaw_jump': math.radians(20.0),
+    }
+    kwargs.update(overrides)
+    return kwargs
+
+
+@pytest.mark.parametrize(
+    'name,value',
+    [
+        ('confirmations', 0),
+        ('confirmations', -1),
+        ('confirmations', 2.5),
+        ('max_hamming', -1),
+        ('loss_timeout', 0.0),
+        ('loss_timeout', -0.5),
+        ('confirmation_window', 0.0),
+        ('max_translation_jump', 0.0),
+        ('max_translation_jump', -0.25),
+        ('max_yaw_jump', 0.0),
+        ('publish_period', -0.1),
+    ],
+)
+def test_rejects_out_of_range_gate_parameters(dock, name, value):
+    with pytest.raises(ValueError, match=name):
+        TagGate(**gate_kwargs(dock, **{name: value}))
+
+
+@pytest.mark.parametrize(
+    'name,value',
+    [
+        ('confirmations', 1),
+        ('max_hamming', 0),
+        ('publish_period', 0.0),
+    ],
+)
+def test_accepts_boundary_gate_parameters(dock, name, value):
+    assert TagGate(**gate_kwargs(dock, **{name: value})) is not None

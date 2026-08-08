@@ -73,6 +73,23 @@ class TagGate:
         max_translation_jump,
         max_yaw_jump,
     ):
+        if not isinstance(confirmations, int) or isinstance(confirmations, bool):
+            raise ValueError('confirmations must be an int')
+        if confirmations < 1:
+            raise ValueError('confirmations must be >= 1')
+        if max_hamming < 0:
+            raise ValueError('max_hamming must be >= 0')
+        for name, value in (
+            ('loss_timeout', loss_timeout),
+            ('confirmation_window', confirmation_window),
+            ('max_translation_jump', max_translation_jump),
+            ('max_yaw_jump', max_yaw_jump),
+        ):
+            if value <= 0:
+                raise ValueError(f'{name} must be > 0')
+        if publish_period < 0:
+            raise ValueError('publish_period must be >= 0')
+
         self.specs = specs
         self.min_margin = min_margin
         self.max_hamming = max_hamming
