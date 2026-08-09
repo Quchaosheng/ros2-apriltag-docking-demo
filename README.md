@@ -1,6 +1,6 @@
-# ROS 2 AprilTag Docking Demo
+﻿# ROS 2 AprilTag Docking Demo
 
-**English** | [简体中文](README.zh-CN.md)
+**English** | [绠€浣撲腑鏂嘳(README.zh-CN.md)
 
 [![ROS 2 CI](https://github.com/Quchaosheng/ros2-apriltag-docking-demo/actions/workflows/ros2-ci.yml/badge.svg?branch=main)](https://github.com/Quchaosheng/ros2-apriltag-docking-demo/actions/workflows/ros2-ci.yml)
 
@@ -185,10 +185,6 @@ Nav2, and docking-action graph in headless mode, then requires `/detected_dock_p
 uses the existing public state contract: this repository does not publish a separate
 `CONFIRMED` Guard topic. The test must be run on the stated Jazzy/Ubuntu environment; it is
 not executable on this Windows host.
-
-## Development Workflow
-
-This project combines direct implementation, upstream component integration, and AI-assisted iteration. Runtime capabilities are evidenced only by source code, tests, CI, simulation, or explicitly labeled hardware evidence; plans and generated text are not runtime evidence. Public Git history remains unchanged.
 
 ## Demo Scope
 
