@@ -6,7 +6,6 @@ from launch.actions import (
     AppendEnvironmentVariable,
     DeclareLaunchArgument,
     IncludeLaunchDescription,
-    TimerAction,
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -39,12 +38,6 @@ def generate_launch_description():
     dock_database = os.path.join(package_share, 'config', 'dock_database.yaml')
     dock_mapping = os.path.join(package_share, 'config', 'docks.yaml')
     apriltag_params = os.path.join(package_share, 'config', 'apriltag.yaml')
-    robot_model = os.path.join(
-        turtlebot_gazebo_share,
-        'models',
-        'turtlebot3_waffle_pi',
-        'model.sdf',
-    )
     robot_bridge_params = os.path.join(
         turtlebot_gazebo_share,
         'params',
@@ -98,23 +91,6 @@ def generate_launch_description():
             )
         ),
         launch_arguments={'use_sim_time': use_sim_time}.items(),
-    )
-    spawn_robot = Node(
-        package='ros_gz_sim',
-        executable='create',
-        arguments=[
-            '-name',
-            'waffle_pi',
-            '-file',
-            robot_model,
-            '-x',
-            '0.0',
-            '-y',
-            '0.0',
-            '-z',
-            '0.01',
-        ],
-        output='screen',
     )
     robot_bridge = Node(
         package='ros_gz_bridge',
@@ -215,10 +191,8 @@ def generate_launch_description():
         gz_server_display,
         gz_client,
         robot_state_publisher,
-        spawn_robot,
         robot_bridge,
-        # Let the spawned model advertise its Gazebo camera topic first.
-        TimerAction(period=5.0, actions=[image_bridge]),
+        image_bridge,
         nav2,
         rviz_node,
         apriltag,

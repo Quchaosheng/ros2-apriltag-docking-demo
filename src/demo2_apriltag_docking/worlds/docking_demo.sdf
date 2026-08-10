@@ -49,6 +49,11 @@
       </link>
     </model>
     <include>
+      <uri>model://turtlebot3_waffle_pi</uri>
+      <name>waffle_pi</name>
+      <pose>0.0 0.0 0.01 0 0 0</pose>
+    </include>
+    <include>
       <uri>model://apriltag_dock</uri>
       <name>demo_charge_dock</name>
       <pose>2.0 0.0 0.0 0 0 0</pose>

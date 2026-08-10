@@ -41,6 +41,15 @@ def test_world_places_dock_at_database_pose():
     assert include.findtext('pose') == '2.0 0.0 0.0 0 0 0'
 
 
+def test_world_loads_robot_before_simulation_starts():
+    root = ET.parse(PACKAGE / 'worlds/docking_demo.sdf').getroot()
+    include = root.find(".//include[name='waffle_pi']")
+
+    assert include is not None
+    assert include.findtext('uri') == 'model://turtlebot3_waffle_pi'
+    assert include.findtext('pose') == '0.0 0.0 0.01 0 0 0'
+
+
 def test_demo_map_is_a_free_six_by_four_meter_area():
     metadata = yaml.safe_load((PACKAGE / 'maps/demo_map.yaml').read_text())
     header = (PACKAGE / 'maps/demo_map.pgm').read_text().splitlines()[:3]
@@ -65,8 +74,7 @@ def test_launch_file_is_valid_python():
     ):
         assert package in source
     assert 'opennav_docking::SimpleChargingDock' in nav2_source
-    assert "package='ros_gz_sim'" in source
-    assert "executable='create'" in source
+    assert "executable='create'" not in source
 
 
 def test_gazebo_servers_use_fixed_seed_and_expected_rendering_modes():
