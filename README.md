@@ -1,6 +1,6 @@
-﻿# ROS 2 AprilTag Docking Demo
+# ROS 2 AprilTag Docking Demo
 
-**English** | [绠€浣撲腑鏂嘳(README.zh-CN.md)
+**English** | [简体中文](README.zh-CN.md)
 
 [![ROS 2 CI](https://github.com/Quchaosheng/ros2-apriltag-docking-demo/actions/workflows/ros2-ci.yml/badge.svg?branch=main)](https://github.com/Quchaosheng/ros2-apriltag-docking-demo/actions/workflows/ros2-ci.yml)
 
