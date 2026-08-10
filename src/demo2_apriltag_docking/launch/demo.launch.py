@@ -28,7 +28,6 @@ def generate_launch_description():
     target_tag_id = LaunchConfiguration('target_tag_id')
     guard_required = LaunchConfiguration('guard_required')
     headless = LaunchConfiguration('headless')
-    headless_rendering = LaunchConfiguration('headless_rendering')
     rviz = LaunchConfiguration('rviz')
 
     world = os.path.join(package_share, 'worlds', 'docking_demo.sdf')
@@ -50,22 +49,7 @@ def generate_launch_description():
         convert_types=True,
     )
 
-    gz_server_headless = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(ros_gz_share, 'launch', 'gz_sim.launch.py')
-        ),
-        launch_arguments={
-            # Server-only CI still needs EGL rendering for the camera sensor.
-            'gz_args': [
-                '-r -s --headless-rendering -v2 --seed 42 "',
-                world,
-                '"',
-            ],
-            'on_exit_shutdown': 'true',
-        }.items(),
-        condition=IfCondition(headless_rendering),
-    )
-    gz_server_display = IncludeLaunchDescription(
+    gz_server = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(ros_gz_share, 'launch', 'gz_sim.launch.py')
         ),
@@ -73,7 +57,6 @@ def generate_launch_description():
             'gz_args': ['-r -s -v2 --seed 42 "', world, '"'],
             'on_exit_shutdown': 'true',
         }.items(),
-        condition=UnlessCondition(headless_rendering),
     )
     gz_client = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -177,7 +160,6 @@ def generate_launch_description():
         DeclareLaunchArgument('target_tag_id', default_value='0'),
         DeclareLaunchArgument('guard_required', default_value='false'),
         DeclareLaunchArgument('headless', default_value='false'),
-        DeclareLaunchArgument('headless_rendering', default_value=headless),
         DeclareLaunchArgument('rviz', default_value='true'),
         AppendEnvironmentVariable(
             'GZ_SIM_RESOURCE_PATH',
@@ -187,8 +169,7 @@ def generate_launch_description():
             'GZ_SIM_RESOURCE_PATH',
             os.path.join(turtlebot_gazebo_share, 'models'),
         ),
-        gz_server_headless,
-        gz_server_display,
+        gz_server,
         gz_client,
         robot_state_publisher,
         robot_bridge,
