@@ -117,5 +117,11 @@ def test_gazebo_server_uses_fixed_seed():
 
     assert world_references == 1
     assert shlex.split(''.join(parts)) == [
-        '-r', '-s', '-v2', '--seed', '42', '/tmp/world.sdf',
+        '-r',
+        '-s',
+        '--headless-rendering',
+        '-v2',
+        '--seed',
+        '42',
+        '/tmp/world.sdf',
     ]
