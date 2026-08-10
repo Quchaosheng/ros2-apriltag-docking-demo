@@ -69,54 +69,62 @@ def test_launch_file_is_valid_python():
     assert "executable='create'" in source
 
 
-def test_gazebo_server_uses_fixed_seed():
+def test_gazebo_servers_use_fixed_seed_and_expected_rendering_modes():
     source = (PACKAGE / 'launch/demo.launch.py').read_text(encoding='utf-8')
     gz_server_assignments = [
         node
         for node in ast.walk(ast.parse(source))
         if isinstance(node, ast.Assign)
         and any(
-            isinstance(target, ast.Name) and target.id == 'gz_server'
+            isinstance(target, ast.Name) and target.id.startswith('gz_server_')
             for target in node.targets
         )
     ]
 
-    assert len(gz_server_assignments) == 1
-    gz_server_call = gz_server_assignments[0].value
-    assert isinstance(gz_server_call, ast.Call)
-    assert isinstance(gz_server_call.func, ast.Name)
-    assert gz_server_call.func.id == 'IncludeLaunchDescription'
+    assert len(gz_server_assignments) == 2
+    commands = []
+    for assignment in gz_server_assignments:
+        gz_server_call = assignment.value
+        assert isinstance(gz_server_call, ast.Call)
+        assert isinstance(gz_server_call.func, ast.Name)
+        assert gz_server_call.func.id == 'IncludeLaunchDescription'
 
-    launch_arguments = next(
-        keyword.value for keyword in gz_server_call.keywords
-        if keyword.arg == 'launch_arguments'
-    )
-    assert isinstance(launch_arguments, ast.Call)
-    assert isinstance(launch_arguments.func, ast.Attribute)
-    assert launch_arguments.func.attr == 'items'
-    arguments_dict = launch_arguments.func.value
-    assert isinstance(arguments_dict, ast.Dict)
+        launch_arguments = next(
+            keyword.value for keyword in gz_server_call.keywords
+            if keyword.arg == 'launch_arguments'
+        )
+        assert isinstance(launch_arguments, ast.Call)
+        assert isinstance(launch_arguments.func, ast.Attribute)
+        assert launch_arguments.func.attr == 'items'
+        arguments_dict = launch_arguments.func.value
+        assert isinstance(arguments_dict, ast.Dict)
 
-    server_args = next(
-        value
-        for key, value in zip(arguments_dict.keys, arguments_dict.values)
-        if isinstance(key, ast.Constant) and key.value == 'gz_args'
-    )
-    assert isinstance(server_args, ast.List)
+        server_args = next(
+            value
+            for key, value in zip(arguments_dict.keys, arguments_dict.values)
+            if isinstance(key, ast.Constant) and key.value == 'gz_args'
+        )
+        assert isinstance(server_args, ast.List)
 
-    parts = []
-    world_references = 0
-    for value in server_args.elts:
-        if isinstance(value, ast.Constant) and isinstance(value.value, str):
-            parts.append(value.value)
-        elif isinstance(value, ast.Name) and value.id == 'world':
-            parts.append('/tmp/world.sdf')
-            world_references += 1
-        else:
-            raise AssertionError(f'Unexpected gz_server argument: {ast.dump(value)}')
+        parts = []
+        world_references = 0
+        for value in server_args.elts:
+            if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                parts.append(value.value)
+            elif isinstance(value, ast.Name) and value.id == 'world':
+                parts.append('/tmp/world.sdf')
+                world_references += 1
+            else:
+                raise AssertionError(
+                    f'Unexpected gz_server argument: {ast.dump(value)}'
+                )
 
-    assert world_references == 1
-    assert shlex.split(''.join(parts)) == [
+        assert world_references == 1
+        commands.append(shlex.split(''.join(parts)))
+
+    common = ['-r', '-s', '-v2', '--seed', '42', '/tmp/world.sdf']
+    assert common in commands
+    assert [
         '-r',
         '-s',
         '--headless-rendering',
@@ -124,4 +132,4 @@ def test_gazebo_server_uses_fixed_seed():
         '--seed',
         '42',
         '/tmp/world.sdf',
-    ]
+    ] in commands
