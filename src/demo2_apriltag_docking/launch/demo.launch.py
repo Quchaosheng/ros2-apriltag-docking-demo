@@ -60,9 +60,12 @@ def generate_launch_description():
             os.path.join(ros_gz_share, 'launch', 'gz_sim.launch.py')
         ),
         launch_arguments={
-            # Keep rendering enabled: the camera sensor needs a render pass even
-            # on CI, where Gazebo falls back to headless rendering automatically.
-            'gz_args': ['-r -v2 --seed 42 "', world, '"'],
+            # Server-only CI still needs EGL rendering for the camera sensor.
+            'gz_args': [
+                '-r -s --headless-rendering -v2 --seed 42 "',
+                world,
+                '"',
+            ],
             'on_exit_shutdown': 'true',
         }.items(),
     )
