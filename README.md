@@ -3,6 +3,7 @@
 **English** | [简体中文](README.zh-CN.md)
 
 [![ROS 2 CI](https://github.com/Quchaosheng/ros2-apriltag-docking-demo/actions/workflows/ros2-ci.yml/badge.svg?branch=main)](https://github.com/Quchaosheng/ros2-apriltag-docking-demo/actions/workflows/ros2-ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-2EA44F)](LICENSE)
 
 A reproducible Gazebo docking workflow that guides a TurtleBot3 to a charging-dock staging pose,
 validates live AprilTag observations, and delegates the final approach to the Nav2 Docking
@@ -46,9 +47,9 @@ The recording shows a live Gazebo camera feed, AprilTag validation, Nav2 staging
 - TurtleBot3 Waffle Pi
 
 The complete Gazebo/AprilTag/Nav2 simulation target is Ubuntu 24.04 + ROS 2 Jazzy + Gazebo
-Harmonic. `headless:=true` hides only the GUI; camera simulation still requires a usable GPU or a
-software-rendering backend. If the camera produces no output, AprilTag will appear as a continuous
-`NO_TAG` state.
+Harmonic. `headless:=true` starts Gazebo server-only with
+`--headless-rendering`; camera simulation still requires a usable GPU or a software-rendering
+backend. If the camera produces no output, AprilTag will appear as a continuous `NO_TAG` state.
 
 The repository targets a manual full-demo environment of ROS 2 Jazzy on Ubuntu
 24.04. CI currently covers node-level and contract tests; it does not
@@ -110,10 +111,11 @@ Run without Gazebo or RViz windows:
 ros2 launch demo2_apriltag_docking demo.launch.py headless:=true rviz:=false
 ```
 
-`headless:=true` removes the Gazebo client window; it does not remove rendering requirements from
-camera simulation. A machine without a usable GPU may need software rendering and can run more
-slowly or fail because of local Gazebo/OGRE/driver configuration. Headless launch is therefore an
-execution mode, not evidence that the complete simulation is GPU-independent.
+`headless:=true` removes the Gazebo client window and enables Gazebo's offscreen
+`--headless-rendering` path. It does not remove rendering requirements from camera simulation. A
+machine without a usable GPU may need software rendering and can run more slowly or fail because
+of local Gazebo/OGRE/driver configuration. Headless launch is therefore an execution mode, not
+evidence that the complete simulation is GPU-independent.
 
 ## Guard Integration
 
@@ -194,3 +196,7 @@ Gazebo camera output and AprilTag detection performance depend on scene lighting
 rendering backend, and available GPU or software-rendering capacity. The simulation demonstrates
 integration behavior; it does not establish real-camera detection range, latency, false-positive
 rate, or embedded-compute performance.
+
+## License
+
+This project is licensed under the [Apache License 2.0](LICENSE).
