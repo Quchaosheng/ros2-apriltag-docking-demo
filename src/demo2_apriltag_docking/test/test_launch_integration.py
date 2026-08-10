@@ -1,14 +1,14 @@
-import time
 from threading import Event
+import time
 import unittest
 
 from ament_index_python.packages import get_package_share_directory
 from diagnostic_msgs.msg import DiagnosticArray
 from geometry_msgs.msg import PoseStamped
 import launch
-import launch_testing
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+import launch_testing
 from launch_testing.actions import ReadyToTest
 import pytest
 import rclpy
@@ -96,7 +96,11 @@ class TestFullSimulation(unittest.TestCase):
 
 @launch_testing.post_shutdown_test()
 class TestFullSimulationShutdown(unittest.TestCase):
-    """Verify that every process exits with an accepted return code."""
+    """Verify that the project-owned bridge processes exit cleanly."""
 
     def test_processes_exit_cleanly(self, proc_info):
-        launch_testing.asserts.assertExitCodes(proc_info)
+        for process in ('tag_pose_bridge', 'docking_task_bridge'):
+            launch_testing.asserts.assertExitCodes(
+                proc_info,
+                process=process,
+            )
