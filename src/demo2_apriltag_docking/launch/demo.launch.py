@@ -6,6 +6,7 @@ from launch.actions import (
     AppendEnvironmentVariable,
     DeclareLaunchArgument,
     IncludeLaunchDescription,
+    TimerAction,
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -216,7 +217,8 @@ def generate_launch_description():
         robot_state_publisher,
         spawn_robot,
         robot_bridge,
-        image_bridge,
+        # Let the spawned model advertise its Gazebo camera topic first.
+        TimerAction(period=5.0, actions=[image_bridge]),
         nav2,
         rviz_node,
         apriltag,
