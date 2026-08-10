@@ -13,6 +13,7 @@ from launch_testing.actions import ReadyToTest
 import pytest
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import String
 
 
@@ -25,7 +26,6 @@ def generate_test_description():
         ),
         launch_arguments={
             'headless': 'true',
-            'headless_rendering': 'false',
             'rviz': 'false',
             'guard_required': 'false',
         }.items(),
@@ -43,6 +43,11 @@ class TestFullSimulation(unittest.TestCase):
         cls.pose_seen = Event()
         cls.accepted_seen = Event()
         cls.docking_idle_seen = Event()
+        state_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
         cls.node.create_subscription(
             PoseStamped,
             '/detected_dock_pose',
@@ -55,7 +60,7 @@ class TestFullSimulation(unittest.TestCase):
             lambda message: cls.docking_idle_seen.set()
             if message.data == 'IDLE'
             else None,
-            10,
+            state_qos,
         )
         cls.node.create_subscription(
             DiagnosticArray,
