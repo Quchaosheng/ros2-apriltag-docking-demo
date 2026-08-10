@@ -25,6 +25,7 @@ def generate_test_description():
         ),
         launch_arguments={
             'headless': 'true',
+            'headless_rendering': 'false',
             'rviz': 'false',
             'guard_required': 'false',
         }.items(),

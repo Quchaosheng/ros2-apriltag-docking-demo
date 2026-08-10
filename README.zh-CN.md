@@ -50,9 +50,9 @@ flowchart LR
 相机仿真仍需要可用 GPU 或软件渲染后端。如果相机没有输出，AprilTag 会持续表现为
 `NO_TAG`。
 
-仓库面向 Ubuntu 24.04 + ROS 2 Jazzy 的人工完整演示环境。CI 当前主要覆盖
-节点级与契约测试，未对完整 Gazebo/AprilTag/Nav2 启动图做
-`launch_testing` 级 release qualification。代码中的 ROS 2 Humble 兼容导入不表示
+CI 覆盖节点级与契约测试，并在 Ubuntu 24.04 + ROS 2 Jazzy 上运行一条完整的
+Gazebo/AprilTag/Nav2 `launch_testing` 链路。由于托管 runner 的 EGL 可用性并不稳定，
+CI 集成测试使用 Xvfb 提供显示渲染上下文。代码中的 ROS 2 Humble 兼容导入不表示
 Ubuntu 22.04 的完整仿真已经验证。
 
 姊妹仓库 `ros2-control-vcan-motor-demo` 目标是 Ubuntu 22.04 + ROS 2 Humble。
@@ -107,6 +107,13 @@ ros2 launch demo2_apriltag_docking demo.launch.py headless:=true rviz:=false
 `--headless-rendering` 路径，但不会消除相机仿真的渲染要求。没有可用 GPU 的机器可能需要
 软件渲染，也可能因本地 Gazebo、OGRE 或驱动配置而运行较慢或失败。因此 headless 是执行模式，
 不能证明完整仿真与 GPU 无关。
+
+在装有 Xvfb 的机器上，可以改用显示上下文渲染，而不是 EGL：
+
+```bash
+xvfb-run -a ros2 launch demo2_apriltag_docking demo.launch.py \
+  headless:=true headless_rendering:=false rviz:=false
+```
 
 ## Guard 集成
 

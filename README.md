@@ -51,11 +51,10 @@ Harmonic. `headless:=true` starts Gazebo server-only with
 `--headless-rendering`; camera simulation still requires a usable GPU or a software-rendering
 backend. If the camera produces no output, AprilTag will appear as a continuous `NO_TAG` state.
 
-The repository targets a manual full-demo environment of ROS 2 Jazzy on Ubuntu
-24.04. CI currently covers node-level and contract tests; it does not
-release-qualify the complete Gazebo/AprilTag/Nav2 launch graph. Humble
-compatibility imports do not imply that the full simulation is validated on
-Ubuntu 22.04.
+CI covers node-level and contract tests plus one complete Gazebo/AprilTag/Nav2
+`launch_testing` path on ROS 2 Jazzy and Ubuntu 24.04. The CI integration test uses an Xvfb
+display-backed rendering context because EGL availability varies across hosted runners. Humble
+compatibility imports do not imply that the full simulation is validated on Ubuntu 22.04.
 
 The sibling `ros2-control-vcan-motor-demo` targets Ubuntu 22.04 with ROS 2
 Humble. Use separate environments or containers for the two demos; do not mix
@@ -116,6 +115,13 @@ ros2 launch demo2_apriltag_docking demo.launch.py headless:=true rviz:=false
 machine without a usable GPU may need software rendering and can run more slowly or fail because
 of local Gazebo/OGRE/driver configuration. Headless launch is therefore an execution mode, not
 evidence that the complete simulation is GPU-independent.
+
+On a machine with Xvfb, use a display-backed server renderer instead of EGL with:
+
+```bash
+xvfb-run -a ros2 launch demo2_apriltag_docking demo.launch.py \
+  headless:=true headless_rendering:=false rviz:=false
+```
 
 ## Guard Integration
 
