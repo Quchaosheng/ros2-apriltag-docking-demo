@@ -61,6 +61,20 @@ def test_demo_map_is_a_free_six_by_four_meter_area():
     assert header == ['P2', '120 80', '255']
 
 
+def test_single_bridge_maps_camera_image_and_info():
+    mappings = yaml.safe_load(
+        (PACKAGE / 'config/turtlebot3_bridge.yaml').read_text()
+    )
+    by_topic = {mapping['ros_topic_name']: mapping for mapping in mappings}
+
+    assert by_topic['camera/image_raw']['gz_type_name'] == 'gz.msgs.Image'
+    assert by_topic['camera/camera_info']['gz_type_name'] == 'gz.msgs.CameraInfo'
+    assert all(
+        mapping['direction'] in {'GZ_TO_ROS', 'ROS_TO_GZ'}
+        for mapping in mappings
+    )
+
+
 def test_launch_file_is_valid_python():
     source = (PACKAGE / 'launch/demo.launch.py').read_text(encoding='utf-8')
     nav2_source = (
@@ -77,6 +91,7 @@ def test_launch_file_is_valid_python():
         assert package in source
     assert 'opennav_docking::SimpleChargingDock' in nav2_source
     assert "executable='create'" not in source
+    assert 'ros_gz_image' not in source
 
 
 def test_gazebo_server_uses_fixed_seed():

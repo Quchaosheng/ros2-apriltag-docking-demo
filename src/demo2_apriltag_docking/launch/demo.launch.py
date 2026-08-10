@@ -38,9 +38,9 @@ def generate_launch_description():
     dock_mapping = os.path.join(package_share, 'config', 'docks.yaml')
     apriltag_params = os.path.join(package_share, 'config', 'apriltag.yaml')
     robot_bridge_params = os.path.join(
-        turtlebot_gazebo_share,
-        'params',
-        'turtlebot3_waffle_pi_bridge.yaml',
+        package_share,
+        'config',
+        'turtlebot3_bridge.yaml',
     )
 
     configured_nav2_params = RewrittenYaml(
@@ -83,12 +83,6 @@ def generate_launch_description():
             '-p',
             f'config_file:={robot_bridge_params}',
         ],
-        output='screen',
-    )
-    image_bridge = Node(
-        package='ros_gz_image',
-        executable='image_bridge',
-        arguments=['/camera/image_raw'],
         output='screen',
     )
     nav2 = IncludeLaunchDescription(
@@ -173,7 +167,6 @@ def generate_launch_description():
         gz_client,
         robot_state_publisher,
         robot_bridge,
-        image_bridge,
         nav2,
         rviz_node,
         apriltag,
