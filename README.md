@@ -47,9 +47,9 @@ The recording shows a live Gazebo camera feed, AprilTag validation, Nav2 staging
 - TurtleBot3 Waffle Pi
 
 The complete Gazebo/AprilTag/Nav2 simulation target is Ubuntu 24.04 + ROS 2 Jazzy + Gazebo
-Harmonic. `headless:=true` starts Gazebo server-only with
-`--headless-rendering`; camera simulation still requires a usable GPU or a software-rendering
-backend. If the camera produces no output, AprilTag will appear as a continuous `NO_TAG` state.
+Harmonic. `headless:=true` starts Gazebo server-only, but camera simulation still requires a
+usable display-backed GPU or software renderer. If the camera produces no output, AprilTag will
+appear as a continuous `NO_TAG` state.
 
 CI covers node-level and contract tests plus one complete Gazebo/AprilTag/Nav2
 `launch_testing` path on ROS 2 Jazzy and Ubuntu 24.04. The CI integration test uses an Xvfb
@@ -110,17 +110,17 @@ Run without Gazebo or RViz windows:
 ros2 launch demo2_apriltag_docking demo.launch.py headless:=true rviz:=false
 ```
 
-`headless:=true` removes the Gazebo client window and enables Gazebo's offscreen
-`--headless-rendering` path. It does not remove rendering requirements from camera simulation. A
-machine without a usable GPU may need software rendering and can run more slowly or fail because
-of local Gazebo/OGRE/driver configuration. Headless launch is therefore an execution mode, not
-evidence that the complete simulation is GPU-independent.
+`headless:=true` removes the Gazebo client window. It does not remove rendering requirements from
+camera simulation. A machine without a usable display-backed GPU may need Xvfb and software
+rendering, and can run more slowly or fail because of local Gazebo/OGRE/driver configuration.
+Headless launch is therefore an execution mode, not evidence that the complete simulation is
+GPU-independent.
 
 On a machine with Xvfb, use a display-backed server renderer instead of EGL with:
 
 ```bash
 xvfb-run -a ros2 launch demo2_apriltag_docking demo.launch.py \
-  headless:=true headless_rendering:=false rviz:=false
+  headless:=true rviz:=false
 ```
 
 ## Guard Integration

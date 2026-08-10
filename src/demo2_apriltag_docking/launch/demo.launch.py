@@ -6,7 +6,6 @@ from launch.actions import (
     AppendEnvironmentVariable,
     DeclareLaunchArgument,
     IncludeLaunchDescription,
-    TimerAction,
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -29,7 +28,6 @@ def generate_launch_description():
     target_tag_id = LaunchConfiguration('target_tag_id')
     guard_required = LaunchConfiguration('guard_required')
     headless = LaunchConfiguration('headless')
-    headless_rendering = LaunchConfiguration('headless_rendering')
     rviz = LaunchConfiguration('rviz')
 
     world = os.path.join(package_share, 'worlds', 'docking_demo.sdf')
@@ -39,16 +37,10 @@ def generate_launch_description():
     dock_database = os.path.join(package_share, 'config', 'dock_database.yaml')
     dock_mapping = os.path.join(package_share, 'config', 'docks.yaml')
     apriltag_params = os.path.join(package_share, 'config', 'apriltag.yaml')
-    robot_model = os.path.join(
-        turtlebot_gazebo_share,
-        'models',
-        'turtlebot3_waffle_pi',
-        'model.sdf',
-    )
     robot_bridge_params = os.path.join(
-        turtlebot_gazebo_share,
-        'params',
-        'turtlebot3_waffle_pi_bridge.yaml',
+        package_share,
+        'config',
+        'turtlebot3_bridge.yaml',
     )
 
     configured_nav2_params = RewrittenYaml(
@@ -57,22 +49,7 @@ def generate_launch_description():
         convert_types=True,
     )
 
-    gz_server_headless = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(ros_gz_share, 'launch', 'gz_sim.launch.py')
-        ),
-        launch_arguments={
-            # Server-only CI still needs EGL rendering for the camera sensor.
-            'gz_args': [
-                '-r -s --headless-rendering -v2 --seed 42 "',
-                world,
-                '"',
-            ],
-            'on_exit_shutdown': 'true',
-        }.items(),
-        condition=IfCondition(headless_rendering),
-    )
-    gz_server_display = IncludeLaunchDescription(
+    gz_server = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(ros_gz_share, 'launch', 'gz_sim.launch.py')
         ),
@@ -80,7 +57,6 @@ def generate_launch_description():
             'gz_args': ['-r -s -v2 --seed 42 "', world, '"'],
             'on_exit_shutdown': 'true',
         }.items(),
-        condition=UnlessCondition(headless_rendering),
     )
     gz_client = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -99,23 +75,6 @@ def generate_launch_description():
         ),
         launch_arguments={'use_sim_time': use_sim_time}.items(),
     )
-    spawn_robot = Node(
-        package='ros_gz_sim',
-        executable='create',
-        arguments=[
-            '-name',
-            'waffle_pi',
-            '-file',
-            robot_model,
-            '-x',
-            '0.0',
-            '-y',
-            '0.0',
-            '-z',
-            '0.01',
-        ],
-        output='screen',
-    )
     robot_bridge = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
@@ -124,12 +83,6 @@ def generate_launch_description():
             '-p',
             f'config_file:={robot_bridge_params}',
         ],
-        output='screen',
-    )
-    image_bridge = Node(
-        package='ros_gz_image',
-        executable='image_bridge',
-        arguments=['/camera/image_raw'],
         output='screen',
     )
     nav2 = IncludeLaunchDescription(
@@ -201,7 +154,6 @@ def generate_launch_description():
         DeclareLaunchArgument('target_tag_id', default_value='0'),
         DeclareLaunchArgument('guard_required', default_value='false'),
         DeclareLaunchArgument('headless', default_value='false'),
-        DeclareLaunchArgument('headless_rendering', default_value=headless),
         DeclareLaunchArgument('rviz', default_value='true'),
         AppendEnvironmentVariable(
             'GZ_SIM_RESOURCE_PATH',
@@ -211,14 +163,10 @@ def generate_launch_description():
             'GZ_SIM_RESOURCE_PATH',
             os.path.join(turtlebot_gazebo_share, 'models'),
         ),
-        gz_server_headless,
-        gz_server_display,
+        gz_server,
         gz_client,
         robot_state_publisher,
-        spawn_robot,
         robot_bridge,
-        # Let the spawned model advertise its Gazebo camera topic first.
-        TimerAction(period=5.0, actions=[image_bridge]),
         nav2,
         rviz_node,
         apriltag,

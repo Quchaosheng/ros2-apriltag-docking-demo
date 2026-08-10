@@ -46,9 +46,8 @@ flowchart LR
 - TurtleBot3 Waffle Pi
 
 完整的 Gazebo/AprilTag/Nav2 仿真目标是 Ubuntu 24.04 + ROS 2 Jazzy + Gazebo Harmonic。
-`headless:=true` 会以 server-only 模式启动 Gazebo，并启用 `--headless-rendering`；
-相机仿真仍需要可用 GPU 或软件渲染后端。如果相机没有输出，AprilTag 会持续表现为
-`NO_TAG`。
+`headless:=true` 会以 server-only 模式启动 Gazebo，但相机仿真仍需要带显示上下文的
+GPU 或软件渲染后端。如果相机没有输出，AprilTag 会持续表现为 `NO_TAG`。
 
 CI 覆盖节点级与契约测试，并在 Ubuntu 24.04 + ROS 2 Jazzy 上运行一条完整的
 Gazebo/AprilTag/Nav2 `launch_testing` 链路。由于托管 runner 的 EGL 可用性并不稳定，
@@ -103,16 +102,15 @@ ros2 service call /demo2/cancel_docking std_srvs/srv/Trigger "{}"
 ros2 launch demo2_apriltag_docking demo.launch.py headless:=true rviz:=false
 ```
 
-`headless:=true` 会移除 Gazebo 客户端窗口，并启用 Gazebo 的离屏
-`--headless-rendering` 路径，但不会消除相机仿真的渲染要求。没有可用 GPU 的机器可能需要
-软件渲染，也可能因本地 Gazebo、OGRE 或驱动配置而运行较慢或失败。因此 headless 是执行模式，
-不能证明完整仿真与 GPU 无关。
+`headless:=true` 会移除 Gazebo 客户端窗口，但不会消除相机仿真的渲染要求。没有可用显示
+上下文 GPU 的机器可能需要 Xvfb 和软件渲染，也可能因本地 Gazebo、OGRE 或驱动配置而运行
+较慢或失败。因此 headless 是执行模式，不能证明完整仿真与 GPU 无关。
 
 在装有 Xvfb 的机器上，可以改用显示上下文渲染，而不是 EGL：
 
 ```bash
 xvfb-run -a ros2 launch demo2_apriltag_docking demo.launch.py \
-  headless:=true headless_rendering:=false rviz:=false
+  headless:=true rviz:=false
 ```
 
 ## Guard 集成
