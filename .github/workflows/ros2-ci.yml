@@ -45,9 +45,6 @@ jobs:
 
       - name: Test package
         shell: bash
-        env:
-          LIBGL_ALWAYS_SOFTWARE: "true"
-          GALLIUM_DRIVER: llvmpipe
         run: |
           source /opt/ros/jazzy/setup.bash
           source install/setup.bash

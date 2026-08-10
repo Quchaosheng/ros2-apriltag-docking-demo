@@ -30,11 +30,8 @@ for document in DOCUMENTS:
 
 english = DOCUMENTS[0].read_text(encoding="utf-8")
 chinese = DOCUMENTS[1].read_text(encoding="utf-8")
-workflow = (ROOT / ".github" / "workflows" / "ros2-ci.yml").read_text(encoding="utf-8")
 assert "(README.zh-CN.md)" in english
 assert "(README.md)" in chinese
-assert 'LIBGL_ALWAYS_SOFTWARE: "true"' in workflow
-assert "GALLIUM_DRIVER: llvmpipe" in workflow
 for required in (
     "apriltag_docking_demo.mp4",
     "ros-jazzy-apriltag-msgs",
