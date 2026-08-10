@@ -2,6 +2,9 @@
 
 [English](README.md) | **简体中文**
 
+[![ROS 2 CI](https://github.com/Quchaosheng/ros2-apriltag-docking-demo/actions/workflows/ros2-ci.yml/badge.svg?branch=main)](https://github.com/Quchaosheng/ros2-apriltag-docking-demo/actions/workflows/ros2-ci.yml)
+[![许可证](https://img.shields.io/badge/license-Apache--2.0-2EA44F)](LICENSE)
+
 这是一个基于 Gazebo 的可复现对接流程：TurtleBot3 先到达充电桩前的 staging
 位姿，系统确认实时 AprilTag 观测后，再由 Nav2 Docking Framework 完成最终接近。
 
@@ -43,12 +46,13 @@ flowchart LR
 - TurtleBot3 Waffle Pi
 
 完整的 Gazebo/AprilTag/Nav2 仿真目标是 Ubuntu 24.04 + ROS 2 Jazzy + Gazebo Harmonic。
-`headless:=true` 只隐藏 GUI；相机仿真仍需要可用 GPU 或软件渲染后端。如果相机没有输出，
-AprilTag 会持续表现为 `NO_TAG`。
+`headless:=true` 会以 server-only 模式启动 Gazebo，并启用 `--headless-rendering`；
+相机仿真仍需要可用 GPU 或软件渲染后端。如果相机没有输出，AprilTag 会持续表现为
+`NO_TAG`。
 
-仓库面向 Ubuntu 24.04 + ROS 2 Jazzy 的人工完整演示环境。CI 当前主要覆盖
-节点级与契约测试，未对完整 Gazebo/AprilTag/Nav2 启动图做
-`launch_testing` 级 release qualification。代码中的 ROS 2 Humble 兼容导入不表示
+CI 覆盖节点级与契约测试，并在 Ubuntu 24.04 + ROS 2 Jazzy 上运行一条完整的
+Gazebo/AprilTag/Nav2 `launch_testing` 链路。由于托管 runner 的 EGL 可用性并不稳定，
+CI 集成测试使用 Xvfb 提供显示渲染上下文。代码中的 ROS 2 Humble 兼容导入不表示
 Ubuntu 22.04 的完整仿真已经验证。
 
 姊妹仓库 `ros2-control-vcan-motor-demo` 目标是 Ubuntu 22.04 + ROS 2 Humble。
@@ -99,8 +103,17 @@ ros2 service call /demo2/cancel_docking std_srvs/srv/Trigger "{}"
 ros2 launch demo2_apriltag_docking demo.launch.py headless:=true rviz:=false
 ```
 
-当前仓库没有会启动完整 Gazebo、`apriltag_ros`、Nav2 和 docking action graph 并断言端到端结果的
-`launch_testing` 仿真集成测试。录屏只能作为演示或人工运行证据，不能作为自动化测试证据。
+`headless:=true` 会移除 Gazebo 客户端窗口，并启用 Gazebo 的离屏
+`--headless-rendering` 路径，但不会消除相机仿真的渲染要求。没有可用 GPU 的机器可能需要
+软件渲染，也可能因本地 Gazebo、OGRE 或驱动配置而运行较慢或失败。因此 headless 是执行模式，
+不能证明完整仿真与 GPU 无关。
+
+在装有 Xvfb 的机器上，可以改用显示上下文渲染，而不是 EGL：
+
+```bash
+xvfb-run -a ros2 launch demo2_apriltag_docking demo.launch.py \
+  headless:=true headless_rendering:=false rviz:=false
+```
 
 ## Guard 集成
 
@@ -179,3 +192,11 @@ Nav2 和 docking action 图，并要求 `/detected_dock_pose` 发布、`tag_pose
 
 本仓库使用 Nav2 基于距离的 `SimpleChargingDock` 行为模拟成功充电，不实现真实
 触点、电池电流检测、电机堵转检测、Jetson 加速或生产安全认证。
+
+Gazebo 相机输出和 AprilTag 检测性能取决于场景光照、分辨率、渲染后端以及可用 GPU
+或软件渲染能力。仿真证明的是集成行为，不建立真实相机检测距离、延迟、误报率或嵌入式
+计算性能结论。
+
+## 许可证
+
+本项目使用 [Apache License 2.0](LICENSE)。
