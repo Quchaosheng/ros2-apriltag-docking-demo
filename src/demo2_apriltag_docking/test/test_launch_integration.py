@@ -1,17 +1,17 @@
+from threading import Event
 import time
 import unittest
-from threading import Event
 
-import launch
-import launch_testing
-import pytest
-import rclpy
 from ament_index_python.packages import get_package_share_directory
 from diagnostic_msgs.msg import DiagnosticArray
 from geometry_msgs.msg import PoseStamped
+import launch
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+import launch_testing
 from launch_testing.actions import ReadyToTest
+import pytest
+import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 
@@ -96,5 +96,11 @@ class TestFullSimulation(unittest.TestCase):
 
 @launch_testing.post_shutdown_test()
 class TestFullSimulationShutdown(unittest.TestCase):
+    """Verify that the project-owned bridge processes exit cleanly."""
+
     def test_processes_exit_cleanly(self, proc_info):
-        proc_info.assertWaitForShutdown(timeout=30)
+        for process in ('tag_pose_bridge', 'docking_task_bridge'):
+            launch_testing.asserts.assertExitCodes(
+                proc_info,
+                process=process,
+            )
