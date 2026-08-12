@@ -12,6 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(${PROJECT_NAME}_core
   src/core/quality_policy.cpp
   src/core/tag_policy.cpp
+  src/core/task_policy.cpp
 )
 target_include_directories(${PROJECT_NAME}_core
   PUBLIC
