@@ -276,7 +276,7 @@ private:
       return;
     }
     goal_handle_ = handle;
-    check_guard();
+    // Let rclcpp_action make the goal result-aware before the Guard timer cancels it.
   }
 
   void on_feedback(
