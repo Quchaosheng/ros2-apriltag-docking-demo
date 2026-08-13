@@ -4,6 +4,7 @@ from demo2_apriltag_docking.tag_policy import load_dock_specs
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
 import rclpy
 from rclpy.action import ActionClient
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Bool, String
@@ -326,7 +327,7 @@ def main(args=None):
     try:
         node = DockingTaskBridge()
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     except (OSError, ValueError, yaml.YAMLError) as exc:
         if node is not None:
