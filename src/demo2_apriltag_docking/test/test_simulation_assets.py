@@ -102,6 +102,7 @@ def test_python_bridges_treat_context_shutdown_as_clean_exit():
         source = path.read_text(encoding='utf-8')
         assert 'from rclpy.executors import ExternalShutdownException' in source
         assert 'except (KeyboardInterrupt, ExternalShutdownException):' in source
+        assert 'except RuntimeError:\n        if rclpy.ok():\n            raise' in source
 
 
 def test_task_bridge_selector_preserves_python_default():
