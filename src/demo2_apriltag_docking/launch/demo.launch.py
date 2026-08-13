@@ -28,6 +28,7 @@ def generate_launch_description():
     target_tag_id = LaunchConfiguration('target_tag_id')
     guard_required = LaunchConfiguration('guard_required')
     tag_bridge_implementation = LaunchConfiguration('tag_bridge_implementation')
+    task_bridge_implementation = LaunchConfiguration('task_bridge_implementation')
     headless = LaunchConfiguration('headless')
     rviz = LaunchConfiguration('rviz')
 
@@ -150,19 +151,33 @@ def generate_launch_description():
         ),
         output='screen',
     )
-    task_bridge = Node(
+    task_bridge_parameters = [
+        docking_params,
+        {
+            'dock_mapping_file': dock_mapping,
+            'target_tag_id': ParameterValue(target_tag_id, value_type=int),
+            'guard_required': ParameterValue(guard_required, value_type=bool),
+            'use_sim_time': use_sim_time,
+        },
+    ]
+    python_task_bridge = Node(
         package='demo2_apriltag_docking',
         executable='docking_task_bridge',
         name='docking_task_bridge',
-        parameters=[
-            docking_params,
-            {
-                'dock_mapping_file': dock_mapping,
-                'target_tag_id': ParameterValue(target_tag_id, value_type=int),
-                'guard_required': ParameterValue(guard_required, value_type=bool),
-                'use_sim_time': use_sim_time,
-            },
-        ],
+        parameters=task_bridge_parameters,
+        condition=IfCondition(
+            EqualsSubstitution(task_bridge_implementation, 'python')
+        ),
+        output='screen',
+    )
+    cpp_task_bridge = Node(
+        package='demo2_apriltag_docking_cpp',
+        executable='docking_task_bridge_cpp',
+        name='docking_task_bridge',
+        parameters=task_bridge_parameters,
+        condition=IfCondition(
+            EqualsSubstitution(task_bridge_implementation, 'cpp')
+        ),
         output='screen',
     )
 
@@ -172,6 +187,11 @@ def generate_launch_description():
         DeclareLaunchArgument('guard_required', default_value='false'),
         DeclareLaunchArgument(
             'tag_bridge_implementation',
+            default_value='python',
+            choices=['python', 'cpp'],
+        ),
+        DeclareLaunchArgument(
+            'task_bridge_implementation',
             default_value='python',
             choices=['python', 'cpp'],
         ),
@@ -194,5 +214,6 @@ def generate_launch_description():
         apriltag,
         python_tag_bridge,
         cpp_tag_bridge,
-        task_bridge,
+        python_task_bridge,
+        cpp_task_bridge,
     ])

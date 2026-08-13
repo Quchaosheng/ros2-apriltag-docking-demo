@@ -29,6 +29,7 @@ def generate_test_description():
             'rviz': 'false',
             'guard_required': 'false',
             'tag_bridge_implementation': 'cpp',
+            'task_bridge_implementation': 'python',
         }.items(),
     )
     return launch.LaunchDescription([demo_launch, ReadyToTest()]), {}

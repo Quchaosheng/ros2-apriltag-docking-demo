@@ -94,6 +94,65 @@ def test_launch_file_is_valid_python():
     assert 'ros_gz_image' not in source
 
 
+def test_task_bridge_selector_preserves_python_default():
+    source = (PACKAGE / 'launch/demo.launch.py').read_text(encoding='utf-8')
+    tree = ast.parse(source)
+
+    assignments = {
+        target.id: node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        for target in node.targets
+        if isinstance(target, ast.Name)
+    }
+    python_task = assignments['python_task_bridge']
+    cpp_task = assignments['cpp_task_bridge']
+
+    assert isinstance(python_task, ast.Call)
+    assert isinstance(cpp_task, ast.Call)
+    assert python_task.func.id == cpp_task.func.id == 'Node'
+
+    def keywords(call):
+        return {keyword.arg: keyword.value for keyword in call.keywords}
+
+    python_keywords = keywords(python_task)
+    cpp_keywords = keywords(cpp_task)
+    assert python_keywords['package'].value == 'demo2_apriltag_docking'
+    assert python_keywords['executable'].value == 'docking_task_bridge'
+    assert cpp_keywords['package'].value == 'demo2_apriltag_docking_cpp'
+    assert cpp_keywords['executable'].value == 'docking_task_bridge_cpp'
+    assert python_keywords['name'].value == 'docking_task_bridge'
+    assert cpp_keywords['name'].value == 'docking_task_bridge'
+    assert ast.dump(python_keywords['parameters']) == ast.dump(
+        cpp_keywords['parameters']
+    )
+
+    for call, implementation in ((python_task, 'python'), (cpp_task, 'cpp')):
+        condition = keywords(call)['condition']
+        assert condition.func.id == 'IfCondition'
+        equals = condition.args[0]
+        assert equals.func.id == 'EqualsSubstitution'
+        assert equals.args[0].id == 'task_bridge_implementation'
+        assert equals.args[1].value == implementation
+
+    declarations = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == 'DeclareLaunchArgument'
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and node.args[0].value == 'task_bridge_implementation'
+    ]
+    assert len(declarations) == 1
+    declaration = keywords(declarations[0])
+    assert declaration['default_value'].value == 'python'
+    assert [item.value for item in declaration['choices'].elts] == [
+        'python', 'cpp',
+    ]
+
+
 def test_gazebo_server_uses_fixed_seed():
     source = (PACKAGE / 'launch/demo.launch.py').read_text(encoding='utf-8')
     gz_server_assignments = [
