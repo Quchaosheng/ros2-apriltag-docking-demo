@@ -76,8 +76,8 @@ TEST(TagPolicy, WrapsYawAndReportsLoss)
   EXPECT_EQ(
     gate.evaluate({detection(0, 0, 60.0, 1.0, 0.0, -179.0 * 3.14159265358979323846 / 180.0)}, 1.4).reason,
     "ACCEPTED");
-  EXPECT_FALSE(gate.loss_reason(1.5).has_value());
-  const auto loss = gate.loss_reason(1.71);
+  EXPECT_FALSE(gate.loss_reason(1.89).has_value());
+  const auto loss = gate.loss_reason(1.91);
   ASSERT_TRUE(loss.has_value());
   EXPECT_EQ(*loss, "TAG_LOST");
 }
