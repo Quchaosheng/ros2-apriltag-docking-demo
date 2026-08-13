@@ -2,6 +2,15 @@ cmake_minimum_required(VERSION 3.8)
 project(demo2_apriltag_docking_cpp)
 
 find_package(ament_cmake REQUIRED)
+find_package(apriltag_msgs REQUIRED)
+find_package(builtin_interfaces REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
 find_package(yaml_cpp_vendor REQUIRED)
 find_package(yaml-cpp REQUIRED)
 
@@ -38,6 +47,26 @@ target_link_libraries(${PROJECT_NAME}_adapters
     yaml-cpp::yaml-cpp
 )
 
+add_executable(tag_pose_bridge_cpp
+  src/nodes/tag_pose_bridge.cpp
+)
+target_compile_options(tag_pose_bridge_cpp PRIVATE -Wall -Wextra -Wpedantic)
+ament_target_dependencies(tag_pose_bridge_cpp
+  apriltag_msgs
+  builtin_interfaces
+  diagnostic_msgs
+  geometry_msgs
+  rclcpp
+  sensor_msgs
+  std_msgs
+  tf2
+  tf2_ros
+)
+target_link_libraries(tag_pose_bridge_cpp
+  ${PROJECT_NAME}_core
+  ${PROJECT_NAME}_adapters
+)
+
 install(
   TARGETS ${PROJECT_NAME}_core ${PROJECT_NAME}_adapters
   EXPORT ${PROJECT_NAME}_targets
@@ -49,6 +78,10 @@ install(DIRECTORY include/ DESTINATION include)
 install(
   EXPORT ${PROJECT_NAME}_targets
   DESTINATION share/${PROJECT_NAME}/cmake
+)
+install(
+  TARGETS tag_pose_bridge_cpp
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)
