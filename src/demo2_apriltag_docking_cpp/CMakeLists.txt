@@ -58,7 +58,7 @@ ament_target_dependencies(${PROJECT_NAME}_tag_pose_adapter
   geometry_msgs
   sensor_msgs
 )
-target_link_libraries(${PROJECT_NAME}_tag_pose_adapter PUBLIC ${PROJECT_NAME}_core)
+target_link_libraries(${PROJECT_NAME}_tag_pose_adapter ${PROJECT_NAME}_core)
 target_link_libraries(${PROJECT_NAME}_adapters
   PUBLIC
     ${PROJECT_NAME}_core
