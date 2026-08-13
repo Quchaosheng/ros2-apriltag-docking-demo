@@ -198,7 +198,7 @@ private:
     try {
       action_client_->async_send_goal(goal, options);
     } catch (const std::exception & error) {
-      policy_->mark_idle();
+      reset_action_state();
       response->success = false;
       response->message = "GOAL_RESPONSE_ERROR";
       publish_state(
@@ -258,6 +258,8 @@ private:
       action_client_->async_cancel_goal(goal_handle_);
     } catch (const rclcpp_action::exceptions::UnknownGoalHandleError &) {
       // The result callback owns the terminal state if the goal already finished.
+    } catch (const std::exception & error) {
+      RCLCPP_WARN(get_logger(), "failed to request docking cancellation: %s", error.what());
     }
   }
 
@@ -301,7 +303,10 @@ private:
     if (wrapped.code == rclcpp_action::ResultCode::CANCELED) {
       state = guard_cancel_reason_.value_or("CANCELED");
       level = diagnostic_msgs::msg::DiagnosticStatus::WARN;
-    } else if (wrapped.result && wrapped.result->success) {
+    } else if (
+      wrapped.code == rclcpp_action::ResultCode::SUCCEEDED &&
+      wrapped.result && wrapped.result->success)
+    {
       state = "SUCCEEDED";
       level = diagnostic_msgs::msg::DiagnosticStatus::OK;
     } else {
@@ -310,9 +315,7 @@ private:
     }
 
     const auto result = wrapped.result;
-    policy_->mark_idle();
-    goal_handle_.reset();
-    cancel_sent_ = false;
+    reset_action_state();
     publish_state(
       state,
       level,
@@ -325,13 +328,20 @@ private:
 
   void finalize_failure(const std::string & reason)
   {
-    policy_->mark_idle();
-    goal_handle_.reset();
-    cancel_sent_ = false;
+    reset_action_state();
     publish_state(
       "FAILED",
       diagnostic_msgs::msg::DiagnosticStatus::ERROR,
       {{"reason", reason}});
+  }
+
+  void reset_action_state()
+  {
+    policy_->mark_idle();
+    goal_handle_.reset();
+    guard_cancel_reason_.reset();
+    cancel_sent_ = false;
+    active_generation_ = 0;
   }
 
   bool is_current(std::uint64_t generation) const
