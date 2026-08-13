@@ -111,4 +111,3 @@ class TestCppTagBridgeShutdown(unittest.TestCase):
                 proc_info,
                 process=process,
             )
-
