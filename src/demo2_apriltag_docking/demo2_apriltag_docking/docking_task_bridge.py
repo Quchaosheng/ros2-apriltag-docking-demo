@@ -1,4 +1,5 @@
 import math
+import struct
 
 from action_msgs.msg import GoalStatus
 from demo2_apriltag_docking.monitor import make_status, shutdown_if_running
@@ -25,6 +26,23 @@ FEEDBACK_STATES = {
     4: 'WAIT_FOR_CHARGE',
     5: 'RETRY',
 }
+
+MAX_STAGING_TIME_ERROR = (
+    'max_staging_time must be finite and representable as a positive float32'
+)
+FLOAT32_MAX = (2.0 - 2.0 ** -23) * 2.0 ** 127
+
+
+def validate_max_staging_time(value):
+    if not math.isfinite(value) or value <= 0.0 or value > FLOAT32_MAX:
+        raise ValueError(MAX_STAGING_TIME_ERROR)
+    try:
+        converted = struct.unpack('=f', struct.pack('=f', value))[0]
+    except OverflowError as exc:
+        raise ValueError(MAX_STAGING_TIME_ERROR) from exc
+    if not math.isfinite(converted) or converted <= 0.0:
+        raise ValueError(MAX_STAGING_TIME_ERROR)
+    return converted
 
 
 def feedback_state_name(value):
@@ -109,8 +127,8 @@ class DockingTaskBridge(Node):
             guard_required=bool(self.get_parameter('guard_required').value),
             guard_timeout=float(self.get_parameter('guard_timeout').value),
         )
-        self.max_staging_time = float(
-            self.get_parameter('max_staging_time').value
+        self.max_staging_time = validate_max_staging_time(
+            float(self.get_parameter('max_staging_time').value)
         )
         self.navigate_to_staging_pose = bool(
             self.get_parameter('navigate_to_staging_pose').value

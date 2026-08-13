@@ -111,7 +111,8 @@ public:
     policy_ = std::make_unique<core::TaskPolicy>(
       get_parameter("guard_required").as_bool(),
       get_parameter("guard_timeout").as_double());
-    max_staging_time_ = get_parameter("max_staging_time").as_double();
+    max_staging_time_ = core::validate_max_staging_time(
+      get_parameter("max_staging_time").as_double());
     navigate_to_staging_pose_ = get_parameter("navigate_to_staging_pose").as_bool();
     shutdown_cancel_timeout_ = get_parameter("shutdown_cancel_timeout").as_double();
     if (!std::isfinite(shutdown_cancel_timeout_) || shutdown_cancel_timeout_ < 0.0) {
@@ -218,7 +219,7 @@ private:
     DockRobot::Goal goal;
     goal.use_dock_id = true;
     goal.dock_id = target_dock_.dock_id;
-    goal.max_staging_time = static_cast<float>(max_staging_time_);
+    goal.max_staging_time = max_staging_time_;
     goal.navigate_to_staging_pose = navigate_to_staging_pose_;
 
     policy_->mark_active();
@@ -446,7 +447,7 @@ private:
 
   core::DockSpec target_dock_;
   std::unique_ptr<core::TaskPolicy> policy_;
-  double max_staging_time_{60.0};
+  float max_staging_time_{60.0F};
   bool navigate_to_staging_pose_{true};
   double shutdown_cancel_timeout_{2.0};
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr state_publisher_;
