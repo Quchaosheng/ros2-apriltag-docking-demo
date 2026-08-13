@@ -1,12 +1,11 @@
 #include "demo2_apriltag_docking_cpp/adapters/dock_spec_loader.hpp"
+#include "demo2_apriltag_docking_cpp/adapters/tag_pose_adapter.hpp"
 #include "demo2_apriltag_docking_cpp/core/quality_policy.hpp"
 #include "demo2_apriltag_docking_cpp/core/tag_policy.hpp"
 
 #include <apriltag_msgs/msg/april_tag_detection_array.hpp>
-#include <builtin_interfaces/msg/time.hpp>
 #include <diagnostic_msgs/msg/diagnostic_array.hpp>
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
-#include <diagnostic_msgs/msg/key_value.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -18,16 +17,13 @@
 #include <tf2_ros/buffer.hpp>
 #include <tf2_ros/transform_listener.hpp>
 
-#include <charconv>
 #include <chrono>
-#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
-#include <system_error>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -36,88 +32,7 @@ namespace demo2_apriltag_docking_cpp::nodes {
 namespace {
 
 constexpr double kPi = 3.141592653589793238462643383279502884;
-using DiagnosticValues = std::vector<std::pair<std::string, std::string>>;
-
-double stamp_seconds(const builtin_interfaces::msg::Time & stamp)
-{
-  return static_cast<double>(stamp.sec) + static_cast<double>(stamp.nanosec) * 1e-9;
-}
-
-std::string number_string(double value)
-{
-  char buffer[64];
-  const auto result = std::to_chars(
-    std::begin(buffer), std::end(buffer), value, std::chars_format::general);
-  if (result.ec != std::errc()) {
-    throw std::runtime_error("failed to format diagnostic number");
-  }
-  std::string text(buffer, result.ptr);
-  if (std::isfinite(value) && text.find_first_of(".eE") == std::string::npos) {
-    text += ".0";
-  }
-  return text;
-}
-
-double round_three(double value)
-{
-  return std::nearbyint(value * 1000.0) / 1000.0;
-}
-
-DiagnosticValues temporal_values(const core::TemporalQuality & timing)
-{
-  DiagnosticValues values;
-  if (timing.detection_age_ms.has_value()) {
-    values.emplace_back("detection_age_ms", number_string(round_three(*timing.detection_age_ms)));
-  }
-  if (timing.tf_age_ms.has_value()) {
-    values.emplace_back("tf_age_ms", number_string(round_three(*timing.tf_age_ms)));
-  }
-  return values;
-}
-
-geometry_msgs::msg::PoseStamped to_pose_message(
-  const geometry_msgs::msg::TransformStamped & transform)
-{
-  geometry_msgs::msg::PoseStamped pose;
-  pose.header = transform.header;
-  pose.pose.position.x = transform.transform.translation.x;
-  pose.pose.position.y = transform.transform.translation.y;
-  pose.pose.position.z = transform.transform.translation.z;
-  pose.pose.orientation = transform.transform.rotation;
-  return pose;
-}
-
-core::Detection metadata_only(
-  const apriltag_msgs::msg::AprilTagDetection & detection,
-  double stamp)
-{
-  return {
-    detection.id,
-    detection.hamming,
-    static_cast<double>(detection.decision_margin),
-    stamp,
-    0.0,
-    0.0,
-    0.0,
-  };
-}
-
-core::Detection to_policy_detection(
-  const apriltag_msgs::msg::AprilTagDetection & detection,
-  const geometry_msgs::msg::TransformStamped & transform,
-  double stamp)
-{
-  const auto & rotation = transform.transform.rotation;
-  return {
-    detection.id,
-    detection.hamming,
-    static_cast<double>(detection.decision_margin),
-    stamp,
-    transform.transform.translation.x,
-    transform.transform.translation.y,
-    core::yaw_from_quaternion(rotation.x, rotation.y, rotation.z, rotation.w),
-  };
-}
+using adapters::DiagnosticValues;
 
 }  // namespace
 
@@ -197,24 +112,20 @@ private:
 
   void on_camera_info(const sensor_msgs::msg::CameraInfo::ConstSharedPtr message)
   {
-    camera_calibration_ = core::validate_camera_calibration(
-      static_cast<int>(message->width),
-      static_cast<int>(message->height),
-      message->k,
-      message->distortion_model);
+    camera_calibration_ = adapters::camera_info_to_calibration(*message);
   }
 
   void on_detections(
     const apriltag_msgs::msg::AprilTagDetectionArray::ConstSharedPtr message)
   {
     const double now = now_seconds();
-    const double detection_stamp = stamp_seconds(message->header.stamp);
+    const double detection_stamp = adapters::stamp_seconds(message->header.stamp);
 
     if (message->detections.size() != 1U) {
       std::vector<core::Detection> detections;
       detections.reserve(message->detections.size());
       for (const auto & detection : message->detections) {
-        detections.push_back(metadata_only(detection, detection_stamp));
+        detections.push_back(adapters::metadata_only(detection, detection_stamp));
       }
       report(gate_->evaluate(detections, now).reason, diagnostic_msgs::msg::DiagnosticStatus::WARN);
       return;
@@ -223,7 +134,8 @@ private:
     const auto & detection_message = message->detections.front();
     const auto dock = specs_.find(detection_message.id);
     if (dock == specs_.end()) {
-      const auto result = gate_->evaluate({metadata_only(detection_message, detection_stamp)}, now);
+      const auto result = gate_->evaluate(
+        {adapters::metadata_only(detection_message, detection_stamp)}, now);
       report(
         result.reason,
         diagnostic_msgs::msg::DiagnosticStatus::WARN,
@@ -246,7 +158,7 @@ private:
       return;
     }
 
-    const double transform_stamp = stamp_seconds(transform.header.stamp);
+    const double transform_stamp = adapters::stamp_seconds(transform.header.stamp);
     const auto timing = core::validate_observation_timing(
       now,
       detection_stamp,
@@ -258,7 +170,7 @@ private:
       report(
         timing.reason,
         diagnostic_msgs::msg::DiagnosticStatus::WARN,
-        temporal_values(timing));
+        adapters::temporal_values(timing));
       return;
     }
 
@@ -276,17 +188,17 @@ private:
       }
     }
 
-    const core::Detection detection = to_policy_detection(
+    const core::Detection detection = adapters::to_policy_detection(
       detection_message, transform, transform_stamp);
     const auto result = gate_->evaluate({detection}, now);
     if (result.accepted) {
-      pose_publisher_->publish(to_pose_message(transform));
+      pose_publisher_->publish(adapters::to_pose_message(transform));
       DiagnosticValues values{
         {"tag_id", std::to_string(detection.tag_id)},
         {"dock_id", result.dock->dock_id},
-        {"margin", number_string(detection.decision_margin)},
+        {"margin", adapters::diagnostic_number(detection.decision_margin)},
       };
-      const auto timing_diagnostics = temporal_values(timing);
+      const auto timing_diagnostics = adapters::temporal_values(timing);
       values.insert(values.end(), timing_diagnostics.begin(), timing_diagnostics.end());
       report(
         "ACCEPTED",
@@ -315,40 +227,21 @@ private:
     DiagnosticValues values = {},
     std::optional<double> refresh_seconds = std::nullopt)
   {
-    const double current_time = now_seconds();
-    const bool repeated = last_state_.has_value() && *last_state_ == state;
-    const bool refresh_due = refresh_seconds.has_value() &&
-      last_diagnostic_time_.has_value() &&
-      current_time - *last_diagnostic_time_ >= *refresh_seconds;
-    if (repeated && !refresh_due) {
+    const auto decision = report_gate_.evaluate(state, now_seconds(), refresh_seconds);
+    if (!decision.publish_diagnostic) {
       return;
     }
 
-    if (!repeated) {
+    if (decision.publish_state) {
       std_msgs::msg::String state_message;
       state_message.data = state;
       state_publisher_->publish(state_message);
-      last_state_ = state;
-    }
-
-    diagnostic_msgs::msg::DiagnosticStatus status;
-    status.name = get_name();
-    status.hardware_id = "demo2_apriltag_docking";
-    status.level = level;
-    status.message = state;
-    status.values.reserve(values.size());
-    for (const auto & [key, value] : values) {
-      diagnostic_msgs::msg::KeyValue item;
-      item.key = key;
-      item.value = value;
-      status.values.push_back(std::move(item));
     }
 
     diagnostic_msgs::msg::DiagnosticArray diagnostics;
     diagnostics.header.stamp = get_clock()->now();
-    diagnostics.status.push_back(std::move(status));
+    diagnostics.status.push_back(adapters::make_status(get_name(), level, state, values));
     diagnostic_publisher_->publish(diagnostics);
-    last_diagnostic_time_ = current_time;
   }
 
   double now_seconds() const
@@ -368,8 +261,7 @@ private:
     detection_subscription_;
   rclcpp::TimerBase::SharedPtr loss_timer_;
   std::optional<core::CameraCalibration> camera_calibration_;
-  std::optional<std::string> last_state_;
-  std::optional<double> last_diagnostic_time_;
+  adapters::ReportGate report_gate_;
 };
 
 }  // namespace demo2_apriltag_docking_cpp::nodes
