@@ -60,15 +60,21 @@ class TestCppTaskActionIntegration(unittest.TestCase):
         cls.states = []
         cls.diagnostics = []
         cls.controlling_seen = Event()
-        cls.waiting_seen = [Event(), Event(), Event()]
+        cls.waiting_seen = [Event(), Event(), Event(), Event()]
         cls.waiting_count = 0
         cls.first_goal_done = Event()
         cls.pending_goal_received = Event()
         cls.release_pending_goal = Event()
         cls.cancel_seen = Event()
+        cls.manual_pending_goal_received = Event()
+        cls.release_manual_pending_goal = Event()
+        cls.manual_cancel_seen = Event()
+        cls.release_manual_result = Event()
         cls.second_goal_done = Event()
         cls.third_goal_done = Event()
+        cls.fourth_goal_done = Event()
         cls.goal_count = 0
+        cls.cancel_count = 0
 
         callback_group = ReentrantCallbackGroup()
         cls.action_server = ActionServer(
@@ -151,11 +157,18 @@ class TestCppTaskActionIntegration(unittest.TestCase):
             cls.pending_goal_received.set()
             if not cls.release_pending_goal.wait(timeout=10.0):
                 return GoalResponse.REJECT
+        if cls.goal_count == 4:
+            cls.manual_pending_goal_received.set()
+            if not cls.release_manual_pending_goal.wait(timeout=10.0):
+                return GoalResponse.REJECT
         return GoalResponse.ACCEPT
 
     @classmethod
     def _on_cancel(cls, _goal_handle):
+        cls.cancel_count += 1
         cls.cancel_seen.set()
+        if cls.cancel_count == 2:
+            cls.manual_cancel_seen.set()
         return CancelResponse.ACCEPT
 
     @classmethod
@@ -191,10 +204,27 @@ class TestCppTaskActionIntegration(unittest.TestCase):
             cls.second_goal_done.set()
             return result
 
-        result.success = True
-        result.error_msg = 'aborted despite payload success'
+        if goal_number == 3:
+            result.success = True
+            result.error_msg = 'aborted despite payload success'
+            goal_handle.abort()
+            cls.third_goal_done.set()
+            return result
+
+        deadline = time.monotonic() + 10.0
+        while time.monotonic() < deadline:
+            if goal_handle.is_cancel_requested:
+                result.success = False
+                result.error_code = DockRobot.Result.FAILED_TO_CONTROL
+                result.error_msg = 'manual canceled pending goal'
+                cls.release_manual_result.wait(timeout=10.0)
+                goal_handle.canceled()
+                cls.fourth_goal_done.set()
+                return result
+            time.sleep(0.01)
+        result.success = False
         goal_handle.abort()
-        cls.third_goal_done.set()
+        cls.fourth_goal_done.set()
         return result
 
     @classmethod
@@ -359,6 +389,42 @@ class TestCppTaskActionIntegration(unittest.TestCase):
             [
                 ('error_code', '0'),
                 ('error_msg', 'aborted despite payload success'),
+                ('num_retries', '0'),
+            ],
+            waiting + 1,
+        )
+
+        self._publish_guard(True)
+        cursor = len(self.diagnostics)
+        response = self._call(self.start_client)
+        self.assertTrue(response.success)
+        self.assertTrue(self.manual_pending_goal_received.wait(timeout=10.0))
+
+        response = self._call(self.cancel_client)
+        self.assertTrue(response.success)
+        self.assertEqual(response.message, 'CANCEL_REQUESTED')
+        self.assertEqual(self.cancel_count, 1)
+        self.release_manual_pending_goal.set()
+
+        self.assertTrue(self.manual_cancel_seen.wait(timeout=10.0))
+        time.sleep(0.3)
+        try:
+            self.assertEqual(self.cancel_count, 2)
+        finally:
+            self.release_manual_result.set()
+        self.assertTrue(self.fourth_goal_done.wait(timeout=10.0))
+        waiting = self._wait_for_diagnostic(
+            DiagnosticStatus.OK,
+            'WAITING_FOR_ACTION',
+            [('dock_id', 'demo_charge_dock')],
+            cursor,
+        )
+        self._wait_for_diagnostic(
+            DiagnosticStatus.WARN,
+            'CANCELED',
+            [
+                ('error_code', str(DockRobot.Result.FAILED_TO_CONTROL)),
+                ('error_msg', 'manual canceled pending goal'),
                 ('num_retries', '0'),
             ],
             waiting + 1,

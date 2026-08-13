@@ -149,9 +149,11 @@ def make_fake_bridge():
     bridge.policy.mark_active()
     bridge._goal_handle = object()
     bridge._guard_cancel_reason = None
+    bridge._manual_cancel_requested = False
     bridge._cancel_sent = False
     bridge.published_states = []
     bridge._publish_state = lambda *args: bridge.published_states.append(args)
+    bridge._now_seconds = lambda: 0.0
     return bridge
 
 
@@ -162,6 +164,7 @@ def test_goal_response_future_error_clears_action_and_reports_failure():
 
     assert bridge.policy.action_active is False
     assert bridge._goal_handle is None
+    assert bridge._manual_cancel_requested is False
     assert bridge.published_states == [
         (
             'FAILED',
@@ -178,6 +181,7 @@ def test_result_future_error_clears_action_and_reports_failure():
 
     assert bridge.policy.action_active is False
     assert bridge._goal_handle is None
+    assert bridge._manual_cancel_requested is False
     assert bridge.published_states == [
         (
             'FAILED',
@@ -215,6 +219,12 @@ class ValueFuture:
         return self.value
 
 
+class FakeResponse:
+
+    success = None
+    message = None
+
+
 class FakeResult:
 
     def __init__(self, *, success):
@@ -240,6 +250,7 @@ def test_aborted_action_cannot_succeed_from_payload_alone():
     )))
 
     assert bridge.policy.action_active is False
+    assert bridge._manual_cancel_requested is False
     assert bridge.published_states == [
         (
             'FAILED',
@@ -247,6 +258,41 @@ def test_aborted_action_cannot_succeed_from_payload_alone():
             {'error_code': 0, 'error_msg': '', 'num_retries': 0},
         )
     ]
+
+
+def test_manual_cancel_is_latched_while_goal_response_is_pending():
+    bridge = make_fake_bridge()
+    bridge._goal_handle = None
+    response = FakeResponse()
+
+    bridge._on_cancel(None, response)
+
+    assert response.success is True
+    assert response.message == 'CANCEL_REQUESTED'
+    assert bridge._manual_cancel_requested is True
+    assert bridge._cancel_sent is False
+
+    goal_handle = FakeGoalHandle()
+    bridge._on_goal_response(ValueFuture(goal_handle))
+
+    assert goal_handle.cancel_calls == 1
+    assert bridge._cancel_sent is True
+
+    bridge._check_guard()
+    bridge._on_cancel(None, FakeResponse())
+    assert goal_handle.cancel_calls == 1
+
+
+def test_rejected_goal_clears_pending_manual_cancel():
+    bridge = make_fake_bridge()
+    bridge._goal_handle = None
+    bridge._manual_cancel_requested = True
+
+    bridge._on_goal_response(ValueFuture(FakeGoalHandle(accepted=False)))
+
+    assert bridge.policy.action_active is False
+    assert bridge._manual_cancel_requested is False
+    assert bridge._cancel_sent is False
 
 
 def test_guard_cancel_is_latched_while_goal_response_is_pending():

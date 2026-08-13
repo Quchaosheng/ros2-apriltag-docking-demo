@@ -172,6 +172,7 @@ class DockingTaskBridge(Node):
         )
         self._goal_handle = None
         self._guard_cancel_reason = None
+        self._manual_cancel_requested = False
         self._cancel_sent = False
         self._last_state = None
         self.guard_timer = self.create_timer(0.1, self._check_guard)
@@ -215,6 +216,7 @@ class DockingTaskBridge(Node):
 
         self.policy.mark_active()
         self._guard_cancel_reason = None
+        self._manual_cancel_requested = False
         self._cancel_sent = False
         future = self.action_client.send_goal_async(
             goal,
@@ -231,11 +233,14 @@ class DockingTaskBridge(Node):
         return response
 
     def _on_cancel(self, _request, response):
-        if not self.policy.action_active or self._goal_handle is None:
+        if not self.policy.action_active:
             response.success = False
             response.message = 'NO_ACTIVE_DOCKING'
             return response
-        self._goal_handle.cancel_goal_async()
+        self._manual_cancel_requested = True
+        if self._goal_handle is not None and not self._cancel_sent:
+            self._goal_handle.cancel_goal_async()
+            self._cancel_sent = True
         response.success = True
         response.message = 'CANCEL_REQUESTED'
         return response
@@ -250,7 +255,10 @@ class DockingTaskBridge(Node):
             self._guard_cancel_reason = reason
             self._publish_state(reason, DiagnosticStatus.ERROR)
         if (
-            self._guard_cancel_reason is not None
+            (
+                self._guard_cancel_reason is not None
+                or self._manual_cancel_requested
+            )
             and self._goal_handle is not None
             and not self._cancel_sent
         ):
@@ -263,6 +271,7 @@ class DockingTaskBridge(Node):
         except Exception as exc:
             self.policy.mark_idle()
             self._goal_handle = None
+            self._manual_cancel_requested = False
             self._cancel_sent = False
             self._publish_state(
                 'FAILED',
@@ -273,6 +282,7 @@ class DockingTaskBridge(Node):
         if not goal_handle.accepted:
             self.policy.mark_idle()
             self._goal_handle = None
+            self._manual_cancel_requested = False
             self._cancel_sent = False
             self._publish_state('FAILED', DiagnosticStatus.ERROR, {'reason': 'REJECTED'})
             return
@@ -296,6 +306,7 @@ class DockingTaskBridge(Node):
         except Exception as exc:
             self.policy.mark_idle()
             self._goal_handle = None
+            self._manual_cancel_requested = False
             self._cancel_sent = False
             self._publish_state(
                 'FAILED',
@@ -316,6 +327,7 @@ class DockingTaskBridge(Node):
 
         self.policy.mark_idle()
         self._goal_handle = None
+        self._manual_cancel_requested = False
         self._cancel_sent = False
         self._publish_state(
             state,
