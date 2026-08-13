@@ -2,13 +2,17 @@ cmake_minimum_required(VERSION 3.8)
 project(demo2_apriltag_docking_cpp)
 
 find_package(ament_cmake REQUIRED)
+find_package(action_msgs REQUIRED)
 find_package(apriltag_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav2_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(yaml_cpp_vendor REQUIRED)
@@ -68,6 +72,24 @@ target_link_libraries(${PROJECT_NAME}_adapters
 add_executable(tag_pose_bridge_cpp
   src/nodes/tag_pose_bridge.cpp
 )
+
+add_executable(docking_task_bridge_cpp
+  src/nodes/docking_task_bridge.cpp
+)
+target_compile_options(docking_task_bridge_cpp PRIVATE -Wall -Wextra -Wpedantic)
+ament_target_dependencies(docking_task_bridge_cpp
+  action_msgs
+  diagnostic_msgs
+  nav2_msgs
+  rclcpp
+  rclcpp_action
+  std_msgs
+  std_srvs
+)
+target_link_libraries(docking_task_bridge_cpp
+  ${PROJECT_NAME}_core
+  ${PROJECT_NAME}_adapters
+)
 target_compile_options(tag_pose_bridge_cpp PRIVATE -Wall -Wextra -Wpedantic)
 ament_target_dependencies(tag_pose_bridge_cpp
   apriltag_msgs
@@ -102,7 +124,7 @@ install(
   DESTINATION share/${PROJECT_NAME}/cmake
 )
 install(
-  TARGETS tag_pose_bridge_cpp
+  TARGETS tag_pose_bridge_cpp docking_task_bridge_cpp
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
