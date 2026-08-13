@@ -227,6 +227,7 @@ private:
     active_generation_ = generation;
     goal_handle_.reset();
     guard_cancel_reason_.reset();
+    manual_cancel_requested_ = false;
     cancel_sent_ = false;
     cancel_ack_received_ = false;
     cancel_accepted_ = false;
@@ -272,12 +273,15 @@ private:
     const std_srvs::srv::Trigger::Request::SharedPtr,
     std_srvs::srv::Trigger::Response::SharedPtr response)
   {
-    if (!policy_->action_active() || !goal_handle_) {
+    if (!policy_->action_active()) {
       response->success = false;
       response->message = "NO_ACTIVE_DOCKING";
       return;
     }
-    send_cancel_once(active_generation_);
+    manual_cancel_requested_ = true;
+    if (goal_handle_) {
+      send_cancel_once(active_generation_);
+    }
     response->success = true;
     response->message = "CANCEL_REQUESTED";
   }
@@ -295,7 +299,7 @@ private:
       guard_cancel_reason_ = *reason;
       publish_state(*reason, diagnostic_msgs::msg::DiagnosticStatus::ERROR);
     }
-    if (guard_cancel_reason_.has_value() && goal_handle_) {
+    if ((guard_cancel_reason_.has_value() || manual_cancel_requested_) && goal_handle_) {
       send_cancel_once(active_generation_);
     }
   }
@@ -411,6 +415,7 @@ private:
     policy_->mark_idle();
     goal_handle_.reset();
     guard_cancel_reason_.reset();
+    manual_cancel_requested_ = false;
     cancel_sent_ = false;
     cancel_ack_received_ = false;
     cancel_accepted_ = false;
@@ -459,6 +464,7 @@ private:
   rclcpp::TimerBase::SharedPtr guard_timer_;
   GoalHandle::SharedPtr goal_handle_;
   std::optional<std::string> guard_cancel_reason_;
+  bool manual_cancel_requested_{false};
   bool cancel_sent_{false};
   bool cancel_ack_received_{false};
   bool cancel_accepted_{false};
