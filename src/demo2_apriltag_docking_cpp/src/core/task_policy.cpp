@@ -1,9 +1,27 @@
 #include "demo2_apriltag_docking_cpp/core/task_policy.hpp"
 
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 
 namespace demo2_apriltag_docking_cpp::core {
+
+float validate_max_staging_time(double value)
+{
+  constexpr char error[] =
+    "max_staging_time must be finite and representable as a positive float32";
+  if (
+    !std::isfinite(value) || value <= 0.0 ||
+    value > std::numeric_limits<float>::max())
+  {
+    throw std::invalid_argument(error);
+  }
+  const float converted = static_cast<float>(value);
+  if (!std::isfinite(converted) || converted <= 0.0F) {
+    throw std::invalid_argument(error);
+  }
+  return converted;
+}
 
 TaskPolicy::TaskPolicy(bool guard_required, double guard_timeout)
 : guard_required_(guard_required), guard_timeout_(guard_timeout)

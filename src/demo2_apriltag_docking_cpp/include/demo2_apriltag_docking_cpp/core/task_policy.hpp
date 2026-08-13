@@ -6,6 +6,8 @@
 
 namespace demo2_apriltag_docking_cpp::core {
 
+float validate_max_staging_time(double value);
+
 class TaskPolicy {
 public:
   TaskPolicy(bool guard_required, double guard_timeout);

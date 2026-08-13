@@ -1,8 +1,13 @@
+import math
+import sys
+
 from action_msgs.msg import GoalStatus
 from demo2_apriltag_docking import docking_task_bridge
 from demo2_apriltag_docking.docking_task_bridge import (
     feedback_state_name,
+    FLOAT32_MAX,
     TaskPolicy,
+    validate_max_staging_time,
 )
 from diagnostic_msgs.msg import DiagnosticStatus
 import pytest
@@ -96,6 +101,35 @@ def test_action_state_is_managed_by_explicit_methods():
 def test_task_policy_rejects_invalid_guard_timeout(guard_timeout):
     with pytest.raises(ValueError, match='guard_timeout must be > 0'):
         TaskPolicy(guard_required=False, guard_timeout=guard_timeout)
+
+
+@pytest.mark.parametrize(
+    'max_staging_time',
+    [
+        0.0,
+        -1.0,
+        float('nan'),
+        float('inf'),
+        -float('inf'),
+        sys.float_info.max,
+        5e-324,
+        math.nextafter(FLOAT32_MAX, math.inf),
+    ],
+)
+def test_rejects_max_staging_time_outside_positive_float32(max_staging_time):
+    message = (
+        'max_staging_time must be finite and representable as a positive float32'
+    )
+    with pytest.raises(ValueError, match=message):
+        validate_max_staging_time(max_staging_time)
+
+
+@pytest.mark.parametrize(
+    'max_staging_time',
+    [60.0, FLOAT32_MAX, 2.0 ** -149],
+)
+def test_accepts_positive_float32_max_staging_time(max_staging_time):
+    assert validate_max_staging_time(max_staging_time) == max_staging_time
 
 
 class FailingFuture:
