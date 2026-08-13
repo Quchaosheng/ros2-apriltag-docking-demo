@@ -39,8 +39,28 @@ def generate_test_description():
         }],
         output='screen',
     )
-    return launch.LaunchDescription([task_bridge, ReadyToTest()]), {
+    timeout_bridge = LaunchNode(
+        package='demo2_apriltag_docking_cpp',
+        executable='docking_task_bridge_cpp',
+        name='docking_task_bridge_timeout',
+        parameters=[{
+            'dock_mapping_file': str(mapping_file),
+            'dock_action_name': '/test_shutdown_timeout/dock_robot',
+            'start_service': '/test_shutdown_timeout/start_docking',
+            'cancel_service': '/test_shutdown_timeout/cancel_docking',
+            'guard_required': False,
+            'state_topic': '/test_shutdown_timeout/docking_state',
+            'shutdown_cancel_timeout': 0.3,
+        }],
+        output='screen',
+    )
+    return launch.LaunchDescription([
+        task_bridge,
+        timeout_bridge,
+        ReadyToTest(),
+    ]), {
         'task_bridge': task_bridge,
+        'timeout_bridge': timeout_bridge,
     }
 
 
@@ -59,6 +79,10 @@ class TestCppTaskShutdownIntegration(unittest.TestCase):
         cls.cancel_seen = Event()
         cls.release_result = Event()
         cls.result_done = Event()
+        cls.timeout_goal_executing = Event()
+        cls.timeout_cancel_seen = Event()
+        cls.release_cancel_ack = Event()
+        cls.timeout_result_done = Event()
 
         cls.action_server = ActionServer(
             cls.node,
@@ -76,6 +100,23 @@ class TestCppTaskShutdownIntegration(unittest.TestCase):
         cls.start_client = cls.node.create_client(
             Trigger,
             '/test_shutdown/start_docking',
+        )
+        cls.timeout_action_server = ActionServer(
+            cls.node,
+            DockRobot,
+            '/test_shutdown_timeout/dock_robot',
+            execute_callback=cls._execute_timeout_goal,
+            cancel_callback=cls._on_timeout_cancel,
+            callback_group=ReentrantCallbackGroup(),
+        )
+        cls.timeout_action_probe = ActionClient(
+            cls.node,
+            DockRobot,
+            '/test_shutdown_timeout/dock_robot',
+        )
+        cls.timeout_start_client = cls.node.create_client(
+            Trigger,
+            '/test_shutdown_timeout/start_docking',
         )
         cls.executor_thread.start()
 
@@ -102,18 +143,43 @@ class TestCppTaskShutdownIntegration(unittest.TestCase):
         return result
 
     @classmethod
+    def _on_timeout_cancel(cls, _goal_handle):
+        cls.timeout_cancel_seen.set()
+        cls.release_cancel_ack.wait(timeout=10.0)
+        return CancelResponse.ACCEPT
+
+    @classmethod
+    def _execute_timeout_goal(cls, goal_handle):
+        cls.timeout_goal_executing.set()
+        deadline = time.monotonic() + 10.0
+        while time.monotonic() < deadline and not goal_handle.is_cancel_requested:
+            time.sleep(0.01)
+
+        result = DockRobot.Result()
+        result.success = False
+        if goal_handle.is_cancel_requested:
+            goal_handle.canceled()
+        else:
+            goal_handle.abort()
+        cls.timeout_result_done.set()
+        return result
+
+    @classmethod
     def tearDownClass(cls):
         cls.release_result.set()
+        cls.release_cancel_ack.set()
         cls.result_done.wait(timeout=5.0)
+        cls.timeout_result_done.wait(timeout=5.0)
         cls.action_server.destroy()
+        cls.timeout_action_server.destroy()
         cls.executor.shutdown(timeout_sec=5.0)
         cls.executor_thread.join(timeout=5.0)
         cls.node.destroy_node()
         rclpy.shutdown()
 
-    def _call_start(self):
-        self.assertTrue(self.start_client.wait_for_service(timeout_sec=10.0))
-        future = self.start_client.call_async(Trigger.Request())
+    def _call_start(self, client):
+        self.assertTrue(client.wait_for_service(timeout_sec=10.0))
+        future = client.call_async(Trigger.Request())
         deadline = time.monotonic() + 10.0
         while time.monotonic() < deadline and not future.done():
             time.sleep(0.01)
@@ -128,7 +194,7 @@ class TestCppTaskShutdownIntegration(unittest.TestCase):
     ):
         self.assertTrue(self.action_probe.wait_for_server(timeout_sec=10.0))
         time.sleep(0.5)
-        response = self._call_start()
+        response = self._call_start(self.start_client)
         self.assertTrue(response.success, response.message)
         self.assertTrue(self.goal_executing.wait(timeout=10.0))
 
@@ -142,10 +208,35 @@ class TestCppTaskShutdownIntegration(unittest.TestCase):
         self.assertFalse(self.result_done.is_set())
         launch_testing.asserts.assertExitCodes(proc_info, process=task_bridge)
 
+    def test_sigterm_stops_waiting_after_cancel_timeout(
+        self,
+        launch_service,
+        proc_info,
+        timeout_bridge,
+    ):
+        self.assertTrue(
+            self.timeout_action_probe.wait_for_server(timeout_sec=10.0)
+        )
+        time.sleep(0.5)
+        response = self._call_start(self.timeout_start_client)
+        self.assertTrue(response.success, response.message)
+        self.assertTrue(self.timeout_goal_executing.wait(timeout=10.0))
+
+        launch_service.emit_event(SignalProcess(
+            signal_number=signal.SIGTERM,
+            process_matcher=lambda action: action is timeout_bridge,
+        ))
+
+        self.assertTrue(self.timeout_cancel_seen.wait(timeout=5.0))
+        proc_info.assertWaitForShutdown(process=timeout_bridge, timeout=3.0)
+        self.assertFalse(self.timeout_result_done.is_set())
+        launch_testing.asserts.assertExitCodes(proc_info, process=timeout_bridge)
+
 
 @launch_testing.post_shutdown_test()
 class TestCppTaskShutdownExit(unittest.TestCase):
     """Verify the signaled bridge exits successfully."""
 
-    def test_process_exits_cleanly(self, proc_info, task_bridge):
-        launch_testing.asserts.assertExitCodes(proc_info, process=task_bridge)
+    def test_processes_exit_cleanly(self, proc_info, task_bridge, timeout_bridge):
+        for process in (task_bridge, timeout_bridge):
+            launch_testing.asserts.assertExitCodes(proc_info, process=process)
