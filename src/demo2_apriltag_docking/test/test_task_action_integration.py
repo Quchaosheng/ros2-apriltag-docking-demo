@@ -124,7 +124,7 @@ class TestTaskActionIntegration(unittest.TestCase):
             cls.diagnostics.append((
                 status.name,
                 status.hardware_id,
-                int(status.level),
+                status.level,
                 status.message,
                 [(value.key, value.value) for value in status.values],
             ))
