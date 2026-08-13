@@ -3,7 +3,7 @@ from threading import Event, Thread
 import time
 import unittest
 
-from diagnostic_msgs.msg import DiagnosticArray
+from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
 import launch
 from launch_ros.actions import Node as LaunchNode
 import launch_testing
@@ -37,6 +37,7 @@ def generate_test_description():
             'guard_timeout': 10.0,
             'state_topic': '/test_cpp/docking_state',
         }],
+        remappings=[('/diagnostics', '/test_cpp/diagnostics')],
         output='screen',
     )
     return launch.LaunchDescription([task_bridge, ReadyToTest()]), {
@@ -57,8 +58,10 @@ class TestCppTaskActionIntegration(unittest.TestCase):
 
         cls.received_goals = []
         cls.states = []
+        cls.diagnostics = []
         cls.controlling_seen = Event()
-        cls.guard_denied_diagnostics = 0
+        cls.waiting_seen = [Event(), Event(), Event()]
+        cls.waiting_count = 0
         cls.first_goal_done = Event()
         cls.pending_goal_received = Event()
         cls.release_pending_goal = Event()
@@ -111,7 +114,7 @@ class TestCppTaskActionIntegration(unittest.TestCase):
         )
         cls.node.create_subscription(
             DiagnosticArray,
-            '/diagnostics',
+            '/test_cpp/diagnostics',
             cls._on_diagnostics,
             10,
         )
@@ -125,11 +128,20 @@ class TestCppTaskActionIntegration(unittest.TestCase):
 
     @classmethod
     def _on_diagnostics(cls, message):
-        cls.guard_denied_diagnostics += sum(
-            status.name == 'docking_task_bridge'
-            and status.message == 'GUARD_DENIED'
-            for status in message.status
-        )
+        for status in message.status:
+            if status.name != 'docking_task_bridge':
+                continue
+            cls.diagnostics.append((
+                status.name,
+                status.hardware_id,
+                int(status.level),
+                status.message,
+                [(value.key, value.value) for value in status.values],
+            ))
+            if status.message == 'WAITING_FOR_ACTION':
+                if cls.waiting_count < len(cls.waiting_seen):
+                    cls.waiting_seen[cls.waiting_count].set()
+                cls.waiting_count += 1
 
     @classmethod
     def _on_goal(cls, goal_request):
@@ -150,6 +162,7 @@ class TestCppTaskActionIntegration(unittest.TestCase):
     def _execute_goal(cls, goal_handle):
         goal_number = len(cls.received_goals)
         result = DockRobot.Result()
+        cls.waiting_seen[goal_number - 1].wait(timeout=10.0)
         if goal_number == 1:
             feedback = DockRobot.Feedback()
             feedback.state = DockRobot.Feedback.CONTROLLING
@@ -233,27 +246,54 @@ class TestCppTaskActionIntegration(unittest.TestCase):
             f'states={self.states}'
         )
 
-    def _wait_for_guard_diagnostics(self, count, timeout=10.0):
+    def _wait_for_diagnostic(self, level, message, values, start, timeout=10.0):
+        expected = (
+            'docking_task_bridge',
+            'demo2_apriltag_docking',
+            level,
+            message,
+            values,
+        )
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            if self.guard_denied_diagnostics >= count:
-                return
+            for index, diagnostic in enumerate(self.diagnostics[start:], start):
+                if diagnostic == expected:
+                    return index
             time.sleep(0.01)
         self.fail(
-            'task bridge did not publish terminal GUARD_DENIED diagnostic; '
-            f'count={self.guard_denied_diagnostics}'
+            f'task bridge did not publish diagnostic {expected}; '
+            f'diagnostics={self.diagnostics[start:]}'
         )
 
     def test_action_lifecycle(self):
         self.assertTrue(self.action_probe.wait_for_server(timeout_sec=10.0))
         time.sleep(0.5)
         self._publish_guard(True)
+        cursor = len(self.diagnostics)
         response = self._call(self.start_client)
         self.assertTrue(response.success, response.message)
         self.assertEqual(response.message, 'DOCKING_REQUESTED')
         self.assertTrue(self.first_goal_done.wait(timeout=10.0))
         self._wait_for_state('CONTROLLING')
         self._wait_for_state('SUCCEEDED')
+        waiting = self._wait_for_diagnostic(
+            DiagnosticStatus.OK,
+            'WAITING_FOR_ACTION',
+            [('dock_id', 'demo_charge_dock')],
+            cursor,
+        )
+        controlling = self._wait_for_diagnostic(
+            DiagnosticStatus.OK,
+            'CONTROLLING',
+            [('num_retries', '1')],
+            waiting + 1,
+        )
+        self._wait_for_diagnostic(
+            DiagnosticStatus.OK,
+            'SUCCEEDED',
+            [('error_code', '0'), ('error_msg', ''), ('num_retries', '1')],
+            controlling + 1,
+        )
 
         first_goal = self.received_goals[0]
         self.assertTrue(first_goal.use_dock_id)
@@ -262,28 +302,67 @@ class TestCppTaskActionIntegration(unittest.TestCase):
         self.assertTrue(first_goal.navigate_to_staging_pose)
 
         self._publish_guard(True)
+        cursor = len(self.diagnostics)
         response = self._call(self.start_client)
         self.assertTrue(response.success)
         self.assertTrue(self.pending_goal_received.wait(timeout=10.0))
 
         self._publish_guard(False)
         self._wait_for_state('GUARD_DENIED')
+        waiting = self._wait_for_diagnostic(
+            DiagnosticStatus.OK,
+            'WAITING_FOR_ACTION',
+            [('dock_id', 'demo_charge_dock')],
+            cursor,
+        )
+        denied = self._wait_for_diagnostic(
+            DiagnosticStatus.ERROR,
+            'GUARD_DENIED',
+            [],
+            waiting + 1,
+        )
         self._publish_guard(True)
         self.release_pending_goal.set()
 
         self.assertTrue(self.cancel_seen.wait(timeout=10.0))
         self.assertTrue(self.second_goal_done.wait(timeout=10.0))
-        self._wait_for_guard_diagnostics(2)
+        self._wait_for_diagnostic(
+            DiagnosticStatus.WARN,
+            'GUARD_DENIED',
+            [
+                ('error_code', str(DockRobot.Result.FAILED_TO_CONTROL)),
+                ('error_msg', 'guard canceled pending goal'),
+                ('num_retries', '0'),
+            ],
+            denied + 1,
+        )
         response = self._call(self.cancel_client)
         self.assertFalse(response.success)
         self.assertEqual(response.message, 'NO_ACTIVE_DOCKING')
 
         failed_count = self.states.count('FAILED') + 1
         self._publish_guard(True)
+        cursor = len(self.diagnostics)
         response = self._call(self.start_client)
         self.assertTrue(response.success)
         self.assertTrue(self.third_goal_done.wait(timeout=10.0))
         self._wait_for_state_count('FAILED', failed_count)
+        waiting = self._wait_for_diagnostic(
+            DiagnosticStatus.OK,
+            'WAITING_FOR_ACTION',
+            [('dock_id', 'demo_charge_dock')],
+            cursor,
+        )
+        self._wait_for_diagnostic(
+            DiagnosticStatus.ERROR,
+            'FAILED',
+            [
+                ('error_code', '0'),
+                ('error_msg', 'aborted despite payload success'),
+                ('num_retries', '0'),
+            ],
+            waiting + 1,
+        )
 
 
 @launch_testing.post_shutdown_test()
