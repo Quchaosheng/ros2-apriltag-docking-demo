@@ -57,6 +57,7 @@ class TestCppTaskActionIntegration(unittest.TestCase):
 
         cls.received_goals = []
         cls.states = []
+        cls.controlling_seen = Event()
         cls.guard_denied_diagnostics = 0
         cls.first_goal_done = Event()
         cls.pending_goal_received = Event()
@@ -101,7 +102,7 @@ class TestCppTaskActionIntegration(unittest.TestCase):
         cls.node.create_subscription(
             String,
             '/test_cpp/docking_state',
-            lambda message: cls.states.append(message.data),
+            cls._on_state,
             QoSProfile(
                 depth=1,
                 reliability=ReliabilityPolicy.RELIABLE,
@@ -115,6 +116,12 @@ class TestCppTaskActionIntegration(unittest.TestCase):
             10,
         )
         cls.executor_thread.start()
+
+    @classmethod
+    def _on_state(cls, message):
+        cls.states.append(message.data)
+        if message.data == 'CONTROLLING':
+            cls.controlling_seen.set()
 
     @classmethod
     def _on_diagnostics(cls, message):
@@ -148,6 +155,7 @@ class TestCppTaskActionIntegration(unittest.TestCase):
             feedback.state = DockRobot.Feedback.CONTROLLING
             feedback.num_retries = 1
             goal_handle.publish_feedback(feedback)
+            cls.controlling_seen.wait(timeout=10.0)
             result.success = True
             result.num_retries = 1
             goal_handle.succeed()
@@ -214,6 +222,17 @@ class TestCppTaskActionIntegration(unittest.TestCase):
             time.sleep(0.01)
         self.fail(f'task bridge did not publish {state}; states={self.states}')
 
+    def _wait_for_state_count(self, state, count, timeout=10.0):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self.states.count(state) >= count:
+                return
+            time.sleep(0.01)
+        self.fail(
+            f'task bridge did not publish {state} {count} times; '
+            f'states={self.states}'
+        )
+
     def _wait_for_guard_diagnostics(self, count, timeout=10.0):
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
@@ -259,11 +278,12 @@ class TestCppTaskActionIntegration(unittest.TestCase):
         self.assertFalse(response.success)
         self.assertEqual(response.message, 'NO_ACTIVE_DOCKING')
 
+        failed_count = self.states.count('FAILED') + 1
         self._publish_guard(True)
         response = self._call(self.start_client)
         self.assertTrue(response.success)
         self.assertTrue(self.third_goal_done.wait(timeout=10.0))
-        self._wait_for_state('FAILED')
+        self._wait_for_state_count('FAILED', failed_count)
 
 
 @launch_testing.post_shutdown_test()

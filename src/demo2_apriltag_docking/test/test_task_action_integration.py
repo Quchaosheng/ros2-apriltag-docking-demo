@@ -57,6 +57,7 @@ class TestTaskActionIntegration(unittest.TestCase):
 
         cls.received_goals = []
         cls.states = []
+        cls.controlling_seen = Event()
         cls.guard_denied_diagnostics = 0
         cls.first_goal_done = Event()
         cls.pending_goal_received = Event()
@@ -90,7 +91,7 @@ class TestTaskActionIntegration(unittest.TestCase):
         cls.node.create_subscription(
             String,
             '/test/docking_state',
-            lambda message: cls.states.append(message.data),
+            cls._on_state,
             QoSProfile(
                 depth=1,
                 reliability=ReliabilityPolicy.RELIABLE,
@@ -104,6 +105,12 @@ class TestTaskActionIntegration(unittest.TestCase):
             10,
         )
         cls.executor_thread.start()
+
+    @classmethod
+    def _on_state(cls, message):
+        cls.states.append(message.data)
+        if message.data == 'CONTROLLING':
+            cls.controlling_seen.set()
 
     @classmethod
     def _on_diagnostics(cls, message):
@@ -136,6 +143,7 @@ class TestTaskActionIntegration(unittest.TestCase):
             feedback.state = DockRobot.Feedback.CONTROLLING
             feedback.num_retries = 1
             goal_handle.publish_feedback(feedback)
+            cls.controlling_seen.wait(timeout=10.0)
             result.success = True
             result.num_retries = 1
             goal_handle.succeed()
