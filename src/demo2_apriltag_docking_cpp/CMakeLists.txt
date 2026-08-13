@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.8)
 project(demo2_apriltag_docking_cpp)
 
 find_package(ament_cmake REQUIRED)
+find_package(yaml_cpp_vendor REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
@@ -21,8 +23,23 @@ target_include_directories(${PROJECT_NAME}_core
 )
 target_compile_options(${PROJECT_NAME}_core PRIVATE -Wall -Wextra -Wpedantic)
 
+add_library(${PROJECT_NAME}_adapters
+  src/adapters/dock_spec_loader.cpp
+)
+target_include_directories(${PROJECT_NAME}_adapters
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+target_compile_options(${PROJECT_NAME}_adapters PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(${PROJECT_NAME}_adapters
+  PUBLIC
+    ${PROJECT_NAME}_core
+    yaml-cpp::yaml-cpp
+)
+
 install(
-  TARGETS ${PROJECT_NAME}_core
+  TARGETS ${PROJECT_NAME}_core ${PROJECT_NAME}_adapters
   EXPORT ${PROJECT_NAME}_targets
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -45,9 +62,13 @@ if(BUILD_TESTING)
   ament_add_gtest(test_task_policy test/task_policy_test.cpp)
   target_link_libraries(test_task_policy ${PROJECT_NAME}_core)
   target_include_directories(test_task_policy PRIVATE include)
+  ament_add_gtest(test_dock_spec_loader test/dock_spec_loader_test.cpp)
+  target_link_libraries(test_dock_spec_loader ${PROJECT_NAME}_adapters)
+  target_include_directories(test_dock_spec_loader PRIVATE include)
 endif()
 
 ament_export_targets(${PROJECT_NAME}_targets HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME}_core)
+ament_export_dependencies(yaml_cpp_vendor yaml-cpp)
 ament_package()
