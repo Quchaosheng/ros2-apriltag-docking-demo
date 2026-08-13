@@ -1,3 +1,4 @@
+from action_msgs.msg import GoalStatus
 from demo2_apriltag_docking import docking_task_bridge
 from demo2_apriltag_docking.docking_task_bridge import (
     feedback_state_name,
@@ -169,6 +170,40 @@ class ValueFuture:
 
     def result(self):
         return self.value
+
+
+class FakeResult:
+
+    def __init__(self, *, success):
+        self.success = success
+        self.error_code = 0
+        self.error_msg = ''
+        self.num_retries = 0
+
+
+class FakeWrappedResult:
+
+    def __init__(self, *, status, success):
+        self.status = status
+        self.result = FakeResult(success=success)
+
+
+def test_aborted_action_cannot_succeed_from_payload_alone():
+    bridge = make_fake_bridge()
+
+    bridge._on_result(ValueFuture(FakeWrappedResult(
+        status=GoalStatus.STATUS_ABORTED,
+        success=True,
+    )))
+
+    assert bridge.policy.action_active is False
+    assert bridge.published_states == [
+        (
+            'FAILED',
+            DiagnosticStatus.ERROR,
+            {'error_code': 0, 'error_msg': '', 'num_retries': 0},
+        )
+    ]
 
 
 def test_guard_cancel_is_latched_while_goal_response_is_pending():

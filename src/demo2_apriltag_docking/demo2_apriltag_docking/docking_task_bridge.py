@@ -285,7 +285,7 @@ class DockingTaskBridge(Node):
         if wrapped.status == GoalStatus.STATUS_CANCELED:
             state = self._guard_cancel_reason or 'CANCELED'
             level = DiagnosticStatus.WARN
-        elif result.success:
+        elif wrapped.status == GoalStatus.STATUS_SUCCEEDED and result.success:
             state = 'SUCCEEDED'
             level = DiagnosticStatus.OK
         else:
