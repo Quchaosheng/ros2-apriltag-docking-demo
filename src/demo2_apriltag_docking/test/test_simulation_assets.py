@@ -94,6 +94,16 @@ def test_launch_file_is_valid_python():
     assert 'ros_gz_image' not in source
 
 
+def test_python_bridges_treat_context_shutdown_as_clean_exit():
+    for path in (
+        PACKAGE / 'demo2_apriltag_docking/docking_task_bridge.py',
+        PACKAGE / 'demo2_apriltag_docking/tag_pose_bridge.py',
+    ):
+        source = path.read_text(encoding='utf-8')
+        assert 'from rclpy.executors import ExternalShutdownException' in source
+        assert 'except (KeyboardInterrupt, ExternalShutdownException):' in source
+
+
 def test_task_bridge_selector_preserves_python_default():
     source = (PACKAGE / 'launch/demo.launch.py').read_text(encoding='utf-8')
     tree = ast.parse(source)
