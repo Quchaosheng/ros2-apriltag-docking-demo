@@ -329,6 +329,9 @@ def main(args=None):
         rclpy.spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
+    except RuntimeError:
+        if rclpy.ok():
+            raise
     except (OSError, ValueError, yaml.YAMLError) as exc:
         if node is not None:
             node.get_logger().fatal(str(exc))
