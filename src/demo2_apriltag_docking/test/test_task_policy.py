@@ -89,6 +89,15 @@ def test_action_state_is_managed_by_explicit_methods():
     assert TaskPolicy.action_active.fset is None
 
 
+@pytest.mark.parametrize(
+    'guard_timeout',
+    [0.0, -1.0, float('nan'), float('inf'), -float('inf')],
+)
+def test_task_policy_rejects_invalid_guard_timeout(guard_timeout):
+    with pytest.raises(ValueError, match='guard_timeout must be > 0'):
+        TaskPolicy(guard_required=False, guard_timeout=guard_timeout)
+
+
 class FailingFuture:
 
     def __init__(self, error):

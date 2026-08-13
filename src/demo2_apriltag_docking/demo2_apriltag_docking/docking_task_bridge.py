@@ -1,3 +1,5 @@
+import math
+
 from action_msgs.msg import GoalStatus
 from demo2_apriltag_docking.monitor import make_status, shutdown_if_running
 from demo2_apriltag_docking.tag_policy import load_dock_specs
@@ -40,6 +42,8 @@ def guard_qos_profile():
 class TaskPolicy:
 
     def __init__(self, *, guard_required, guard_timeout):
+        if not math.isfinite(guard_timeout) or guard_timeout <= 0.0:
+            raise ValueError('guard_timeout must be > 0')
         self.guard_required = guard_required
         self.guard_timeout = guard_timeout
         self.guard_allowed = None

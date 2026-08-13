@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <limits>
 #include <stdexcept>
 
 namespace core = demo2_apriltag_docking_cpp::core;
@@ -50,5 +51,13 @@ TEST(TaskPolicy, RejectsInvalidTimeout)
 {
   EXPECT_THROW(core::TaskPolicy(true, 0.0), std::invalid_argument);
   EXPECT_THROW(core::TaskPolicy(true, -1.0), std::invalid_argument);
+  EXPECT_THROW(
+    core::TaskPolicy(true, std::numeric_limits<double>::quiet_NaN()),
+    std::invalid_argument);
+  EXPECT_THROW(
+    core::TaskPolicy(true, std::numeric_limits<double>::infinity()),
+    std::invalid_argument);
+  EXPECT_THROW(
+    core::TaskPolicy(true, -std::numeric_limits<double>::infinity()),
+    std::invalid_argument);
 }
-
