@@ -104,6 +104,8 @@ def make_fake_bridge():
     bridge.policy = TaskPolicy(guard_required=False, guard_timeout=2.0)
     bridge.policy.mark_active()
     bridge._goal_handle = object()
+    bridge._guard_cancel_reason = None
+    bridge._cancel_sent = False
     bridge.published_states = []
     bridge._publish_state = lambda *args: bridge.published_states.append(args)
     return bridge
@@ -139,6 +141,61 @@ def test_result_future_error_clears_action_and_reports_failure():
             {'reason': 'RESULT_ERROR', 'error_msg': 'result failed'},
         )
     ]
+
+
+class FakeGoalHandle:
+
+    def __init__(self, *, accepted=True):
+        self.accepted = accepted
+        self.cancel_calls = 0
+
+    def cancel_goal_async(self):
+        self.cancel_calls += 1
+
+    def get_result_async(self):
+        return CallbackFuture()
+
+
+class CallbackFuture:
+
+    def add_done_callback(self, callback):
+        self.callback = callback
+
+
+class ValueFuture:
+
+    def __init__(self, value):
+        self.value = value
+
+    def result(self):
+        return self.value
+
+
+def test_guard_cancel_is_latched_while_goal_response_is_pending():
+    bridge = make_fake_bridge()
+    bridge.policy = TaskPolicy(guard_required=True, guard_timeout=2.0)
+    bridge.policy.mark_active()
+    bridge._goal_handle = None
+    bridge._now_seconds = lambda: 1.0
+    bridge.policy.update_guard(False, stamp=1.0)
+
+    bridge._check_guard()
+
+    assert bridge._guard_cancel_reason == 'GUARD_DENIED'
+    assert bridge._cancel_sent is False
+    assert bridge.published_states == [
+        ('GUARD_DENIED', DiagnosticStatus.ERROR)
+    ]
+
+    bridge.policy.update_guard(True, stamp=1.1)
+    goal_handle = FakeGoalHandle()
+    bridge._on_goal_response(ValueFuture(goal_handle))
+
+    assert goal_handle.cancel_calls == 1
+    assert bridge._cancel_sent is True
+
+    bridge._check_guard()
+    assert goal_handle.cancel_calls == 1
 
 
 @pytest.mark.parametrize(
