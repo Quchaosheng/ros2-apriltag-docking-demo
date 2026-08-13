@@ -15,8 +15,8 @@ TEST(QualityPolicy, AcceptsFreshObservation)
   EXPECT_EQ(result.reason, "ACCEPTED");
   ASSERT_TRUE(result.detection_age_ms.has_value());
   ASSERT_TRUE(result.tf_age_ms.has_value());
-  EXPECT_DOUBLE_EQ(*result.detection_age_ms, 100.0);
-  EXPECT_DOUBLE_EQ(*result.tf_age_ms, 150.0);
+  EXPECT_NEAR(*result.detection_age_ms, 100.0, 1e-9);
+  EXPECT_NEAR(*result.tf_age_ms, 150.0, 1e-9);
 }
 
 TEST(QualityPolicy, RejectsStaleAndFutureObservation)
