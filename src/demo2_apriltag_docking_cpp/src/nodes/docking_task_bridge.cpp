@@ -7,6 +7,7 @@
 #include <diagnostic_msgs/msg/key_value.hpp>
 #include <nav2_msgs/action/dock_robot.hpp>
 #include <rclcpp/create_timer.hpp>
+#include <rclcpp/executors/single_threaded_executor.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <std_msgs/msg/bool.hpp>
@@ -14,6 +15,8 @@
 #include <std_srvs/srv/trigger.hpp>
 
 #include <chrono>
+#include <cmath>
+#include <csignal>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -24,11 +27,24 @@
 #include <utility>
 #include <vector>
 
+namespace {
+
+volatile std::sig_atomic_t shutdown_signal = 0;
+
+void handle_shutdown_signal(int signal_value)
+{
+  shutdown_signal = signal_value;
+}
+
+}  // namespace
+
 namespace demo2_apriltag_docking_cpp::nodes {
 namespace {
 
 using DockRobot = nav2_msgs::action::DockRobot;
+using DockActionClient = rclcpp_action::Client<DockRobot>;
 using GoalHandle = rclcpp_action::ClientGoalHandle<DockRobot>;
+using CancelResponse = DockActionClient::CancelResponse;
 using DiagnosticValues = std::vector<std::pair<std::string, std::string>>;
 
 std::string feedback_state_name(std::uint16_t value)
@@ -97,6 +113,10 @@ public:
       get_parameter("guard_timeout").as_double());
     max_staging_time_ = get_parameter("max_staging_time").as_double();
     navigate_to_staging_pose_ = get_parameter("navigate_to_staging_pose").as_bool();
+    shutdown_cancel_timeout_ = get_parameter("shutdown_cancel_timeout").as_double();
+    if (!std::isfinite(shutdown_cancel_timeout_) || shutdown_cancel_timeout_ < 0.0) {
+      throw std::invalid_argument("shutdown_cancel_timeout must be finite and non-negative");
+    }
 
     const auto state_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
     state_publisher_ = create_publisher<std_msgs::msg::String>(
@@ -132,6 +152,28 @@ public:
     publish_state("IDLE", diagnostic_msgs::msg::DiagnosticStatus::OK);
   }
 
+  void begin_shutdown()
+  {
+    shutting_down_ = true;
+  }
+
+  void drive_shutdown()
+  {
+    if (policy_->action_active() && goal_handle_) {
+      send_cancel_once(active_generation_);
+    }
+  }
+
+  bool shutdown_settled() const
+  {
+    return !policy_->action_active() || (cancel_ack_received_ && cancel_accepted_);
+  }
+
+  double shutdown_cancel_timeout() const
+  {
+    return shutdown_cancel_timeout_;
+  }
+
 private:
   void declare_parameters()
   {
@@ -146,12 +188,19 @@ private:
     declare_parameter<std::string>("state_topic", "/demo2/docking_state");
     declare_parameter<double>("max_staging_time", 60.0);
     declare_parameter<bool>("navigate_to_staging_pose", true);
+    declare_parameter<double>("shutdown_cancel_timeout", 2.0);
   }
 
   void on_start(
     const std_srvs::srv::Trigger::Request::SharedPtr,
     std_srvs::srv::Trigger::Response::SharedPtr response)
   {
+    if (shutting_down_) {
+      response->success = false;
+      response->message = "SHUTTING_DOWN";
+      publish_state(response->message, diagnostic_msgs::msg::DiagnosticStatus::WARN);
+      return;
+    }
     const auto [allowed, reason] = policy_->can_start(now_seconds());
     if (!allowed) {
       response->success = false;
@@ -178,6 +227,8 @@ private:
     goal_handle_.reset();
     guard_cancel_reason_.reset();
     cancel_sent_ = false;
+    cancel_ack_received_ = false;
+    cancel_accepted_ = false;
 
     typename rclcpp_action::Client<DockRobot>::SendGoalOptions options;
     options.goal_response_callback =
@@ -255,11 +306,30 @@ private:
     }
     cancel_sent_ = true;
     try {
-      action_client_->async_cancel_goal(goal_handle_);
+      action_client_->async_cancel_goal(
+        goal_handle_,
+        [this, generation](const CancelResponse::SharedPtr response) {
+          on_cancel_response(generation, response);
+        });
     } catch (const rclcpp_action::exceptions::UnknownGoalHandleError &) {
       // The result callback owns the terminal state if the goal already finished.
     } catch (const std::exception & error) {
       RCLCPP_WARN(get_logger(), "failed to request docking cancellation: %s", error.what());
+    }
+  }
+
+  void on_cancel_response(
+    std::uint64_t generation,
+    const CancelResponse::SharedPtr & response)
+  {
+    if (!is_current(generation)) {
+      return;
+    }
+    cancel_ack_received_ = true;
+    cancel_accepted_ =
+      response && response->return_code == CancelResponse::ERROR_NONE;
+    if (!cancel_accepted_) {
+      RCLCPP_WARN(get_logger(), "docking cancellation request was not accepted");
     }
   }
 
@@ -341,6 +411,8 @@ private:
     goal_handle_.reset();
     guard_cancel_reason_.reset();
     cancel_sent_ = false;
+    cancel_ack_received_ = false;
+    cancel_accepted_ = false;
     active_generation_ = 0;
   }
 
@@ -376,6 +448,7 @@ private:
   std::unique_ptr<core::TaskPolicy> policy_;
   double max_staging_time_{60.0};
   bool navigate_to_staging_pose_{true};
+  double shutdown_cancel_timeout_{2.0};
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr state_publisher_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostic_publisher_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr guard_subscription_;
@@ -386,6 +459,9 @@ private:
   GoalHandle::SharedPtr goal_handle_;
   std::optional<std::string> guard_cancel_reason_;
   bool cancel_sent_{false};
+  bool cancel_ack_received_{false};
+  bool cancel_accepted_{false};
+  bool shutting_down_{false};
   std::uint64_t generation_{0};
   std::uint64_t active_generation_{0};
   std::optional<std::string> last_state_;
@@ -395,10 +471,40 @@ private:
 
 int main(int argc, char * argv[])
 {
-  rclcpp::init(argc, argv);
+  rclcpp::init(
+    argc,
+    argv,
+    rclcpp::InitOptions(),
+    rclcpp::SignalHandlerOptions::None);
+  std::signal(SIGINT, handle_shutdown_signal);
+  std::signal(SIGTERM, handle_shutdown_signal);
   try {
     auto node = std::make_shared<demo2_apriltag_docking_cpp::nodes::DockingTaskBridge>();
-    rclcpp::spin(node);
+    rclcpp::executors::SingleThreadedExecutor executor;
+    executor.add_node(node);
+    while (rclcpp::ok() && shutdown_signal == 0) {
+      executor.spin_once(std::chrono::milliseconds(50));
+    }
+
+    if (rclcpp::ok() && shutdown_signal != 0) {
+      node->begin_shutdown();
+      node->drive_shutdown();
+      const auto timeout = std::chrono::duration<double>(node->shutdown_cancel_timeout());
+      const auto deadline = std::chrono::steady_clock::now() + timeout;
+      while (
+        rclcpp::ok() && !node->shutdown_settled() &&
+        std::chrono::steady_clock::now() < deadline)
+      {
+        executor.spin_once(std::chrono::milliseconds(20));
+        node->drive_shutdown();
+      }
+      if (!node->shutdown_settled()) {
+        RCLCPP_WARN(
+          node->get_logger(),
+          "timed out waiting for active docking cancellation during shutdown");
+      }
+    }
+    executor.remove_node(node);
   } catch (const std::exception & error) {
     RCLCPP_FATAL(rclcpp::get_logger("docking_task_bridge"), "%s", error.what());
     if (rclcpp::ok()) {
