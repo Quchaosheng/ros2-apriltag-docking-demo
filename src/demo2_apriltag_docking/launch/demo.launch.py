@@ -9,7 +9,7 @@ from launch.actions import (
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import EqualsSubstitution, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from nav2_common.launch import RewrittenYaml
@@ -27,6 +27,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     target_tag_id = LaunchConfiguration('target_tag_id')
     guard_required = LaunchConfiguration('guard_required')
+    tag_bridge_implementation = LaunchConfiguration('tag_bridge_implementation')
     headless = LaunchConfiguration('headless')
     rviz = LaunchConfiguration('rviz')
 
@@ -123,7 +124,7 @@ def generate_launch_description():
         ],
         output='screen',
     )
-    tag_bridge = Node(
+    python_tag_bridge = Node(
         package='demo2_apriltag_docking',
         executable='tag_pose_bridge',
         name='tag_pose_bridge',
@@ -131,6 +132,22 @@ def generate_launch_description():
             docking_params,
             {'dock_mapping_file': dock_mapping, 'use_sim_time': use_sim_time},
         ],
+        condition=IfCondition(
+            EqualsSubstitution(tag_bridge_implementation, 'python')
+        ),
+        output='screen',
+    )
+    cpp_tag_bridge = Node(
+        package='demo2_apriltag_docking_cpp',
+        executable='tag_pose_bridge_cpp',
+        name='tag_pose_bridge',
+        parameters=[
+            docking_params,
+            {'dock_mapping_file': dock_mapping, 'use_sim_time': use_sim_time},
+        ],
+        condition=IfCondition(
+            EqualsSubstitution(tag_bridge_implementation, 'cpp')
+        ),
         output='screen',
     )
     task_bridge = Node(
@@ -153,6 +170,11 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('target_tag_id', default_value='0'),
         DeclareLaunchArgument('guard_required', default_value='false'),
+        DeclareLaunchArgument(
+            'tag_bridge_implementation',
+            default_value='python',
+            choices=['python', 'cpp'],
+        ),
         DeclareLaunchArgument('headless', default_value='false'),
         DeclareLaunchArgument('rviz', default_value='true'),
         AppendEnvironmentVariable(
@@ -170,6 +192,7 @@ def generate_launch_description():
         nav2,
         rviz_node,
         apriltag,
-        tag_bridge,
+        python_tag_bridge,
+        cpp_tag_bridge,
         task_bridge,
     ])
