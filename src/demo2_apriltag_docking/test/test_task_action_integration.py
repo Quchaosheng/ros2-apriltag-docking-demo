@@ -11,7 +11,7 @@ from launch_testing.actions import ReadyToTest
 from nav2_msgs.action import DockRobot
 import pytest
 import rclpy
-from rclpy.action import ActionServer, CancelResponse, GoalResponse
+from rclpy.action import ActionClient, ActionServer, CancelResponse, GoalResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
@@ -75,6 +75,7 @@ class TestTaskActionIntegration(unittest.TestCase):
             cancel_callback=cls._on_cancel,
             callback_group=callback_group,
         )
+        cls.action_probe = ActionClient(cls.node, DockRobot, '/test/dock_robot')
         cls.start_client = cls.node.create_client(Trigger, '/test/start_docking')
         cls.cancel_client = cls.node.create_client(Trigger, '/test/cancel_docking')
         cls.guard_publisher = cls.node.create_publisher(
@@ -174,6 +175,13 @@ class TestTaskActionIntegration(unittest.TestCase):
         return future.result()
 
     def _publish_guard(self, allowed):
+        deadline = time.monotonic() + 10.0
+        while time.monotonic() < deadline:
+            if self.guard_publisher.get_subscription_count() > 0:
+                break
+            time.sleep(0.01)
+        self.assertGreater(self.guard_publisher.get_subscription_count(), 0)
+
         deadline = time.monotonic() + 3.0
         while time.monotonic() < deadline:
             self.guard_publisher.publish(Bool(data=allowed))
@@ -199,9 +207,11 @@ class TestTaskActionIntegration(unittest.TestCase):
         )
 
     def test_action_success_and_pending_guard_cancel(self):
+        self.assertTrue(self.action_probe.wait_for_server(timeout_sec=10.0))
+        time.sleep(0.5)
         self._publish_guard(True)
         response = self._call(self.start_client)
-        self.assertTrue(response.success)
+        self.assertTrue(response.success, response.message)
         self.assertEqual(response.message, 'DOCKING_REQUESTED')
         self.assertTrue(self.first_goal_done.wait(timeout=10.0))
         self._wait_for_state('CONTROLLING')
