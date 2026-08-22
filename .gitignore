@@ -1,4 +1,5 @@
 .worktrees/
+/.vs/
 build/
 install/
 log/
