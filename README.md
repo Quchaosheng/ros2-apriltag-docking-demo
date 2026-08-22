@@ -31,6 +31,10 @@ The project reuses `opennav_docking::SimpleChargingDock`. Custom code is limited
 - Three-frame confirmation, publication rate limiting, Tag loss, and pose-jump rejection.
 - Guard, DockRobot Action, and diagnostic integration.
 
+The live bridge nodes are implemented in C++17. See
+[`docs/cpp-refactor.md`](docs/cpp-refactor.md) for the package layout and build
+instructions. The launch interface and ROS topic contracts are unchanged.
+
 ## Demo Video
 
 ![AprilTag docking demo](docs/demo/apriltag_docking_demo.gif)
