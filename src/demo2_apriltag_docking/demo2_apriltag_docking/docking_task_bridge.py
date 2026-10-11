@@ -149,6 +149,8 @@ class DockingTaskBridge(Node):
         )
         self._goal_handle = None
         self._guard_cancel_reason = None
+        self._cancel_requested = False
+        self._request_id = 0
         self._last_state = None
         self.guard_timer = self.create_timer(0.1, self._check_guard)
         self._publish_state('IDLE', DiagnosticStatus.OK)
@@ -191,11 +193,16 @@ class DockingTaskBridge(Node):
 
         self.policy.mark_active()
         self._guard_cancel_reason = None
+        self._cancel_requested = False
+        self._request_id += 1
+        request_id = self._request_id
         future = self.action_client.send_goal_async(
             goal,
             feedback_callback=self._on_feedback,
         )
-        future.add_done_callback(self._on_goal_response)
+        future.add_done_callback(
+            lambda result: self._on_goal_response(result, request_id)
+        )
         response.success = True
         response.message = 'DOCKING_REQUESTED'
         self._publish_state(
@@ -206,9 +213,16 @@ class DockingTaskBridge(Node):
         return response
 
     def _on_cancel(self, _request, response):
-        if not self.policy.action_active or self._goal_handle is None:
+        if not self.policy.action_active:
             response.success = False
             response.message = 'NO_ACTIVE_DOCKING'
+            return response
+        # The goal handle is null until the asynchronous acceptance arrives, so
+        # the intent is latched and replayed against the accepted handle.
+        if self._goal_handle is None:
+            self._cancel_requested = True
+            response.success = True
+            response.message = 'CANCEL_REQUESTED'
             return response
         self._goal_handle.cancel_goal_async()
         response.success = True
@@ -220,18 +234,29 @@ class DockingTaskBridge(Node):
         self._check_guard()
 
     def _check_guard(self):
+        if self._guard_cancel_reason is not None:
+            return
         reason = self.policy.cancel_reason(self._now_seconds())
-        if reason and self._goal_handle is not None and self._guard_cancel_reason is None:
-            self._guard_cancel_reason = reason
+        if not reason:
+            return
+        # Latch before acceptance too: a denial that recovers while the goal
+        # response is still in flight must not let the docking proceed.
+        self._guard_cancel_reason = reason
+        if self._goal_handle is not None:
             self._goal_handle.cancel_goal_async()
-            self._publish_state(reason, DiagnosticStatus.ERROR)
+        self._publish_state(reason, DiagnosticStatus.ERROR)
 
-    def _on_goal_response(self, future):
+    def _on_goal_response(self, future, request_id):
+        if request_id != self._request_id:
+            # A stale response for a superseded request must not touch the
+            # current action's state.
+            return
         try:
             goal_handle = future.result()
         except Exception as exc:
             self.policy.mark_idle()
             self._goal_handle = None
+            self._cancel_requested = False
             self._publish_state(
                 'FAILED',
                 DiagnosticStatus.ERROR,
@@ -241,12 +266,24 @@ class DockingTaskBridge(Node):
         if not goal_handle.accepted:
             self.policy.mark_idle()
             self._goal_handle = None
+            self._cancel_requested = False
             self._publish_state('FAILED', DiagnosticStatus.ERROR, {'reason': 'REJECTED'})
             return
         self._goal_handle = goal_handle
+        if self._guard_cancel_reason is not None or self._cancel_requested:
+            # A latched guard denial, or a cancel requested while the goal was
+            # still being accepted, cancels this exact handle now.
+            cancelled_by_operator = self._cancel_requested
+            self._cancel_requested = False
+            goal_handle.cancel_goal_async()
+            if cancelled_by_operator and self._guard_cancel_reason is None:
+                self._publish_state('CANCEL_REQUESTED', DiagnosticStatus.WARN)
+            return
         self._check_guard()
         result_future = goal_handle.get_result_async()
-        result_future.add_done_callback(self._on_result)
+        result_future.add_done_callback(
+            lambda result: self._on_result(result, request_id)
+        )
 
     def _on_feedback(self, feedback_message):
         feedback = feedback_message.feedback
@@ -257,12 +294,15 @@ class DockingTaskBridge(Node):
             {'num_retries': feedback.num_retries},
         )
 
-    def _on_result(self, future):
+    def _on_result(self, future, request_id):
+        if request_id != self._request_id:
+            return
         try:
             wrapped = future.result()
         except Exception as exc:
             self.policy.mark_idle()
             self._goal_handle = None
+            self._cancel_requested = False
             self._publish_state(
                 'FAILED',
                 DiagnosticStatus.ERROR,
@@ -282,6 +322,7 @@ class DockingTaskBridge(Node):
 
         self.policy.mark_idle()
         self._goal_handle = None
+        self._cancel_requested = False
         self._publish_state(
             state,
             level,
