@@ -115,6 +115,7 @@ class TagGate:
         self._last_accepted = None
         self._last_publication = None
         self._last_seen = None
+        self._last_source_stamp = None
 
     def evaluate(self, detections, now):
         if not detections:
@@ -145,6 +146,14 @@ class TagGate:
             self._reset_confirmation()
 
         if not self._confirmed:
+            # Confirmation must count distinct source observations: the same
+            # detection replayed by the callback must not reach the threshold.
+            if self._last_source_stamp == detection.stamp:
+                return GateResult(False, 'REPEATED_OBSERVATION', detection, dock)
+            if self._last_source_stamp is not None and detection.stamp < self._last_source_stamp:
+                self._reset_confirmation()
+            self._last_source_stamp = detection.stamp
+
             expired = (
                 self._confirmation_started is None
                 or now - self._confirmation_started > self.confirmation_window

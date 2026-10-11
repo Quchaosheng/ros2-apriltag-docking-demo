@@ -149,6 +149,38 @@ def test_confirmation_window_restarts(gate):
     assert gate.evaluate([make_detection(stamp=1.9)], now=1.9).accepted is True
 
 
+def test_replays_of_one_observation_never_confirm(gate):
+    """Issue #16: three copies of a single source frame must not confirm."""
+    detection = make_detection(stamp=100.0)
+
+    reasons = [
+        gate.evaluate([detection], now=now).reason
+        for now in (1.0, 1.05, 1.1)
+    ]
+
+    assert reasons == ['CONFIRMING', 'REPEATED_OBSERVATION', 'REPEATED_OBSERVATION']
+
+
+def test_distinct_source_stamps_confirm(gate):
+    first = gate.evaluate([make_detection(stamp=1.0)], now=1.0)
+    second = gate.evaluate([make_detection(stamp=1.1)], now=1.05)
+    third = gate.evaluate([make_detection(stamp=1.2)], now=1.1)
+
+    assert [first.reason, second.reason] == ['CONFIRMING', 'CONFIRMING']
+    assert third.accepted is True
+
+
+def test_backward_source_stamp_resets_confirmation(gate):
+    gate.evaluate([make_detection(stamp=1.0)], now=1.0)
+    gate.evaluate([make_detection(stamp=1.1)], now=1.05)
+
+    rewound = gate.evaluate([make_detection(stamp=0.5)], now=1.1)
+    next_frame = gate.evaluate([make_detection(stamp=0.6)], now=1.15)
+
+    assert rewound.reason == 'CONFIRMING'
+    assert next_frame.reason == 'CONFIRMING'
+
+
 def test_rate_limits_confirmed_pose(gate):
     gate.evaluate([make_detection(stamp=1.0)], now=1.0)
     gate.evaluate([make_detection(stamp=1.1)], now=1.1)

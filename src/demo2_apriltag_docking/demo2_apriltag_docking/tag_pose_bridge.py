@@ -236,7 +236,9 @@ class TagPoseBridge(Node):
                     {'reason': calibration.reason},
                 )
                 return
-        detection = to_policy_detection(tag_message, transform, transform_stamp)
+        # Observation identity is the source array stamp; the TF lookup stamp is
+        # a different clock reading and must not stand in for it.
+        detection = to_policy_detection(tag_message, transform, stamp)
         result = self.gate.evaluate([detection], now)
         if result.accepted:
             self.pose_publisher.publish(to_pose_message(transform))
