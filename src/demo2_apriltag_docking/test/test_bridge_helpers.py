@@ -7,6 +7,7 @@ from demo2_apriltag_docking.monitor import make_status
 from demo2_apriltag_docking.tag_pose_bridge import to_policy_detection
 from diagnostic_msgs.msg import DiagnosticStatus
 from geometry_msgs.msg import TransformStamped
+import pytest
 
 
 def test_make_status_serializes_monitor_values():
@@ -98,3 +99,29 @@ def test_shutdown_only_runs_for_active_context(monkeypatch):
     monkeypatch.setattr(monitor.rclpy, 'ok', lambda: True)
     monitor.shutdown_if_running()
     assert calls == ['shutdown']
+
+
+def make_transform(**overrides):
+    transform = TransformStamped()
+    transform.transform.rotation.w = 1.0
+    for name, value in overrides.items():
+        setattr(transform.transform.rotation, name, value)
+    return transform
+
+
+def test_finite_transform_is_accepted():
+    assert tag_pose_bridge.transform_is_finite(make_transform()) is True
+
+
+@pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+def test_non_finite_transform_is_rejected(value):
+    transform = make_transform(x=value)
+
+    assert tag_pose_bridge.transform_is_finite(transform) is False
+
+
+def test_degenerate_zero_norm_quaternion_is_rejected():
+    # Zero rotation would otherwise be reported as a valid yaw of 0.0.
+    transform = make_transform(w=0.0)
+
+    assert tag_pose_bridge.transform_is_finite(transform) is False

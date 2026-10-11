@@ -29,6 +29,26 @@ class GateResult:
     dock: DockSpec | None = None
 
 
+def nonfinite_fields(detection):
+    """Names of numeric fields that are not finite.
+
+    NaN compares false against every bound, so a NaN margin or pose would slip
+    through the gate checks below and be confirmed as a valid dock pose.
+    """
+    fields = {
+        'decision_margin': detection.decision_margin,
+        'stamp': detection.stamp,
+        'x': detection.x,
+        'y': detection.y,
+        'yaw': detection.yaw,
+    }
+    return [
+        name
+        for name, value in fields.items()
+        if not isinstance(value, (int, float)) or not math.isfinite(value)
+    ]
+
+
 def load_dock_specs(raw):
     docks = raw.get('docks') if isinstance(raw, dict) else None
     if not isinstance(docks, dict) or not docks:
@@ -126,6 +146,8 @@ class TagGate:
         dock = self.specs.get(detection.tag_id)
         if dock is None:
             return self._reject('UNKNOWN_TAG')
+        if nonfinite_fields(detection):
+            return self._reject('NONFINITE_DETECTION')
         if detection.hamming > self.max_hamming:
             return self._reject('HAMMING')
         if detection.decision_margin < self.min_margin:

@@ -20,6 +20,23 @@ from tf2_ros import Buffer, TransformException, TransformListener
 import yaml
 
 
+def transform_is_finite(transform):
+    """Reject non-finite or degenerate TF transforms before they are published.
+
+    A zero-norm quaternion carries no rotation but still yields a plausible
+    looking yaw of 0.0, so it must be rejected explicitly.
+    """
+    rotation = transform.transform.rotation
+    translation = transform.transform.translation
+    values = (
+        rotation.x, rotation.y, rotation.z, rotation.w,
+        translation.x, translation.y, translation.z,
+    )
+    if any(not math.isfinite(value) for value in values):
+        return False
+    return math.hypot(rotation.x, rotation.y, rotation.z, rotation.w) > 1e-6
+
+
 def to_policy_detection(message, transform, stamp):
     rotation = transform.transform.rotation
     sin_yaw = 2.0 * (rotation.w * rotation.z + rotation.x * rotation.y)
@@ -201,6 +218,14 @@ class TagPoseBridge(Node):
                 'TF_UNAVAILABLE',
                 DiagnosticStatus.WARN,
                 {'tag_id': tag_message.id, 'error': exc},
+            )
+            return
+
+        if not transform_is_finite(transform):
+            self._report(
+                'NONFINITE_TRANSFORM',
+                DiagnosticStatus.WARN,
+                {'tag_id': tag_message.id},
             )
             return
 

@@ -113,6 +113,48 @@ def test_rejects_multiple_tags(gate):
     assert result.reason == 'MULTI_TAG'
 
 
+@pytest.mark.parametrize(
+    ('field', 'name'),
+    [
+        ('margin', 'decision_margin'),
+        ('stamp', 'stamp'),
+        ('x', 'x'),
+        ('y', 'y'),
+        ('yaw', 'yaw'),
+    ],
+)
+@pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+def test_rejects_non_finite_detection_fields(gate, field, name, value):
+    detection = make_detection(**{field: value})
+
+    result = gate.evaluate([detection], now=1.0)
+
+    assert result.accepted is False
+    assert result.reason == 'NONFINITE_DETECTION', name
+
+
+def test_non_finite_detection_reported_by_issue_reproduction(gate):
+    """Issue #15: NaN fields must not be confirmed as a dock pose."""
+    detection = Detection(0, 0, float('nan'), 1.0, float('nan'), 0.0, float('nan'))
+
+    reasons = [gate.evaluate([detection], now=now).reason
+               for now in (1.0, 1.05, 1.1)]
+
+    assert reasons == ['NONFINITE_DETECTION'] * 3
+
+
+def test_non_finite_detection_never_advances_confirmation(gate):
+    good = make_detection(stamp=1.0)
+    bad = make_detection(stamp=float('nan'))
+
+    assert gate.evaluate([good], now=1.0).reason == 'CONFIRMING'
+    assert gate.evaluate([bad], now=1.1).reason == 'NONFINITE_DETECTION'
+    assert gate.evaluate([bad], now=1.1).reason == 'NONFINITE_DETECTION'
+    assert gate.evaluate([good], now=1.2).reason == 'CONFIRMING'
+    assert gate.evaluate([good], now=1.3).reason == 'CONFIRMING'
+    assert gate.evaluate([good], now=1.4).accepted is True
+
+
 def test_requires_three_consecutive_frames(gate, dock):
     first = gate.evaluate([make_detection(stamp=1.0)], now=1.0)
     second = gate.evaluate([make_detection(stamp=1.1)], now=1.1)
