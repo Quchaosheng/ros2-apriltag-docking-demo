@@ -44,16 +44,51 @@ class TaskPolicy:
         self.guard_allowed = None
         self.guard_stamp = None
         self._action_active = False
+        self._request_id = 0
+        self._cancel_request = None
 
     @property
     def action_active(self):
         return self._action_active
 
+    @property
+    def request_id(self):
+        """Identifies the request in flight, so a late callback can tell whether
+        it still belongs to the current one."""
+        return self._request_id
+
     def mark_active(self):
         self._action_active = True
+        self._request_id += 1
+        self._cancel_request = None
+        return self._request_id
 
     def mark_idle(self):
         self._action_active = False
+        self._cancel_request = None
+
+    def request_cancel(self):
+        """Latch the intent to cancel, whether or not a goal handle exists yet.
+
+        A cancel that arrives between mark_active() and the goal response has no
+        handle to cancel. Dropping it there is what let an accepted goal keep
+        docking after the caller had asked it to stop, so the intent is kept and
+        applied the moment the handle appears.
+        """
+        if not self._action_active:
+            return False
+        self._cancel_request = {'request_id': self._request_id}
+        return True
+
+    def pending_cancel(self):
+        return self._cancel_request
+
+    def clear_cancel(self, request_id=None):
+        """Forget the latched intent, but only for the request it belongs to."""
+        if self._cancel_request is None:
+            return
+        if request_id is None or self._cancel_request['request_id'] == request_id:
+            self._cancel_request = None
 
     def update_guard(self, allowed, stamp):
         self.guard_allowed = bool(allowed)
@@ -206,10 +241,19 @@ class DockingTaskBridge(Node):
         return response
 
     def _on_cancel(self, _request, response):
-        if not self.policy.action_active or self._goal_handle is None:
+        if not self.policy.action_active:
             response.success = False
             response.message = 'NO_ACTIVE_DOCKING'
             return response
+
+        self.policy.request_cancel()
+        if self._goal_handle is None:
+            # Still waiting for the goal response. The intent is latched and
+            # _on_goal_response applies it to the handle as soon as one exists.
+            response.success = True
+            response.message = 'CANCEL_REQUESTED'
+            return response
+
         self._goal_handle.cancel_goal_async()
         response.success = True
         response.message = 'CANCEL_REQUESTED'
@@ -221,10 +265,17 @@ class DockingTaskBridge(Node):
 
     def _check_guard(self):
         reason = self.policy.cancel_reason(self._now_seconds())
-        if reason and self._goal_handle is not None and self._guard_cancel_reason is None:
-            self._guard_cancel_reason = reason
+        if not reason or self._guard_cancel_reason is not None:
+            return
+
+        self._guard_cancel_reason = reason
+        # Latch the intent even with no handle yet: the guard may recover while
+        # the goal response is outstanding, and the denial still has to apply to
+        # the goal that is eventually accepted.
+        self.policy.request_cancel()
+        if self._goal_handle is not None:
             self._goal_handle.cancel_goal_async()
-            self._publish_state(reason, DiagnosticStatus.ERROR)
+        self._publish_state(reason, DiagnosticStatus.ERROR)
 
     def _on_goal_response(self, future):
         try:
@@ -244,6 +295,12 @@ class DockingTaskBridge(Node):
             self._publish_state('FAILED', DiagnosticStatus.ERROR, {'reason': 'REJECTED'})
             return
         self._goal_handle = goal_handle
+        # A cancel that arrived while this response was outstanding is applied
+        # here, before the result is awaited, so the goal cannot keep docking.
+        pending = self.policy.pending_cancel()
+        if pending is not None and pending['request_id'] == self.policy.request_id:
+            goal_handle.cancel_goal_async()
+            self.policy.clear_cancel(pending['request_id'])
         self._check_guard()
         result_future = goal_handle.get_result_async()
         result_future.add_done_callback(self._on_result)
