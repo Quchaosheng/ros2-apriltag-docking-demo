@@ -48,6 +48,19 @@ def metadata_only(message, stamp):
     )
 
 
+def quaternion_is_usable(rotation):
+    """Reject a rotation that cannot be turned into a yaw.
+
+    A zero-length quaternion is the degenerate case rather than the non-finite
+    one: its components are finite, and ``atan2(0, 1)`` would report a confident
+    zero yaw for a transform that carries no orientation at all.
+    """
+    values = (rotation.x, rotation.y, rotation.z, rotation.w)
+    if any(not math.isfinite(value) for value in values):
+        return False
+    return sum(value * value for value in values) > 1e-12
+
+
 def lookup_tag_transform(buffer, target_frame, tag_frame):
     return buffer.lookup_transform(target_frame, tag_frame, Time())
 
@@ -201,6 +214,14 @@ class TagPoseBridge(Node):
                 'TF_UNAVAILABLE',
                 DiagnosticStatus.WARN,
                 {'tag_id': tag_message.id, 'error': exc},
+            )
+            return
+
+        if not quaternion_is_usable(transform.transform.rotation):
+            self._report(
+                'TF_MALFORMED',
+                DiagnosticStatus.WARN,
+                {'tag_id': tag_message.id},
             )
             return
 

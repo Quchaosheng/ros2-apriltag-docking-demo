@@ -29,6 +29,37 @@ class GateResult:
     dock: DockSpec | None = None
 
 
+def _is_finite_number(value):
+    """True for a real number that a comparison can be trusted with."""
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+    )
+
+
+def detection_rejection(detection):
+    """Reason to reject a sample before it can touch the confirmation state.
+
+    NaN compares false against everything, so every check below it would pass
+    silently and the sample would count as a confirmation. Validate first, and
+    treat a malformed sample like any other rejection: it resets the run.
+    """
+    for value in (detection.tag_id, detection.hamming):
+        if not isinstance(value, int) or isinstance(value, bool):
+            return 'MALFORMED'
+    for value in (
+        detection.decision_margin,
+        detection.stamp,
+        detection.x,
+        detection.y,
+        detection.yaw,
+    ):
+        if not _is_finite_number(value):
+            return 'NON_FINITE'
+    return None
+
+
 def load_dock_specs(raw):
     docks = raw.get('docks') if isinstance(raw, dict) else None
     if not isinstance(docks, dict) or not docks:
@@ -123,6 +154,9 @@ class TagGate:
             return self._reject('MULTI_TAG')
 
         detection = detections[0]
+        invalid = detection_rejection(detection)
+        if invalid is not None:
+            return self._reject(invalid)
         dock = self.specs.get(detection.tag_id)
         if dock is None:
             return self._reject('UNKNOWN_TAG')

@@ -285,3 +285,53 @@ def test_rejects_empty_specs(dock):
 )
 def test_accepts_boundary_gate_parameters(dock, name, value):
     assert TagGate(**gate_kwargs(dock, **{name: value})) is not None
+
+
+@pytest.mark.parametrize(
+    'field,value',
+    [
+        ('margin', float('nan')),
+        ('margin', float('inf')),
+        ('margin', float('-inf')),
+        ('stamp', float('nan')),
+        ('stamp', float('inf')),
+        ('x', float('nan')),
+        ('x', float('inf')),
+        ('y', float('nan')),
+        ('y', float('-inf')),
+        ('yaw', float('nan')),
+        ('yaw', float('inf')),
+    ],
+)
+def test_rejects_non_finite_detection_values(gate, field, value):
+    detection = make_detection(**{field: value})
+    result = gate.evaluate([detection], 1.0)
+    assert result.accepted is False
+    assert result.reason == 'NON_FINITE'
+    assert result.detection is None
+
+
+@pytest.mark.parametrize('tag_id', [0.0, '0', None, True])
+def test_rejects_non_integer_tag_id(gate, tag_id):
+    detection = make_detection(tag_id=tag_id)
+    result = gate.evaluate([detection], 1.0)
+    assert result.accepted is False
+    assert result.reason == 'MALFORMED'
+
+
+@pytest.mark.parametrize('hamming', [0.0, '0', None, True])
+def test_rejects_non_integer_hamming(gate, hamming):
+    detection = make_detection(hamming=hamming)
+    result = gate.evaluate([detection], 1.0)
+    assert result.accepted is False
+    assert result.reason == 'MALFORMED'
+
+
+def test_non_finite_sample_cannot_confirm_or_preserve_progress(gate):
+    # One good frame, then a NaN frame, then another good frame: the run has to
+    # start over rather than treat the bad sample as the middle confirmation.
+    assert gate.evaluate([make_detection()], 1.0).reason == 'CONFIRMING'
+    assert gate.evaluate([make_detection(margin=float('nan'))], 1.05).reason == 'NON_FINITE'
+    third = gate.evaluate([make_detection()], 1.1)
+    assert third.reason == 'CONFIRMING'
+    assert third.accepted is False
