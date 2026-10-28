@@ -181,6 +181,32 @@ def test_backward_source_stamp_resets_confirmation(gate):
     assert next_frame.reason == 'CONFIRMING'
 
 
+def test_distinct_frames_outside_the_window_never_confirm(gate):
+    """Distinct samples still have to land inside the confirmation window."""
+    first = gate.evaluate([make_detection(stamp=1.0)], now=1.0)
+    second = gate.evaluate([make_detection(stamp=1.1)], now=1.3)
+    third = gate.evaluate([make_detection(stamp=1.2)], now=1.7)
+
+    assert first.reason == 'CONFIRMING'
+    assert second.reason == 'CONFIRMING'
+    assert third.reason == 'CONFIRMING'
+    assert third.accepted is False
+
+
+def test_backward_ros_clock_resets_confirmation(gate):
+    """A ROS clock that jumps backwards must not carry a run across the jump."""
+    gate.evaluate([make_detection(stamp=1.0)], now=1.0)
+    gate.evaluate([make_detection(stamp=1.1)], now=1.05)
+
+    jumped = gate.evaluate([make_detection(stamp=1.2)], now=0.5)
+    after = gate.evaluate([make_detection(stamp=1.3)], now=0.55)
+
+    assert jumped.reason == 'CONFIRMING'
+    assert jumped.accepted is False
+    assert after.reason == 'CONFIRMING'
+    assert after.accepted is False
+
+
 def test_rate_limits_confirmed_pose(gate):
     gate.evaluate([make_detection(stamp=1.0)], now=1.0)
     gate.evaluate([make_detection(stamp=1.1)], now=1.1)

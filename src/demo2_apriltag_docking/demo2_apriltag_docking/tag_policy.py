@@ -132,12 +132,17 @@ class TagGate:
         if detection.decision_margin < self.min_margin:
             return self._reject('LOW_MARGIN')
 
-        if (
-            self._last_seen is not None
-            and now - self._last_seen > self.loss_timeout
-        ):
-            self._last_accepted = None
-            self._reset_confirmation()
+        if self._last_seen is not None:
+            if now < self._last_seen:
+                # The ROS clock went backwards. Whatever was being confirmed was
+                # confirmed against a timeline that no longer exists, and the
+                # window arithmetic below would read the jump as "no time
+                # passed", so start over rather than carry it across.
+                self._last_accepted = None
+                self._reset_confirmation()
+            elif now - self._last_seen > self.loss_timeout:
+                self._last_accepted = None
+                self._reset_confirmation()
         self._last_seen = now
         if self._is_pose_jump(detection):
             return self._reject('POSE_JUMP')
